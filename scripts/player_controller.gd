@@ -114,7 +114,7 @@ func _input(event: InputEvent):
         if current_state_not_playing():
                 return
 
-        # Mouse look
+        # Mouse look (desktop only)
         if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
                 rotate_y(-event.relative.x * MOUSE_SENSITIVITY)
                 head.rotate_x(-event.relative.y * MOUSE_SENSITIVITY)
@@ -211,7 +211,11 @@ func toggle_flashlight():
         if flashlight:
                 flashlight.visible = is_flashlight_on
                 if is_flashlight_on:
+                        flashlight.light_energy = 2.5 * (GameManager.flashlight_battery / 100.0)
+                        flashlight.spot_range = 25.0
+                        flashlight.spot_angle = 45.0
                         _play_flashlight_sound()
+        print("[Player] Flashlight: %s (battery: %.1f%%)" % ["ON" if is_flashlight_on else "OFF", GameManager.flashlight_battery])
 
 
 func _play_flashlight_sound():

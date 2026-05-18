@@ -207,9 +207,10 @@ func _create_room(center: Vector3, size: Vector2, room_name: String):
         # Dim room light
         var room_light = OmniLight3D.new()
         room_light.position = center + Vector3(0, 2.5, 0)
-        room_light.light_color = Color(0.6, 0.5, 0.4)
-        room_light.light_energy = 0.15
-        room_light.omni_range = 8.0
+        room_light.light_color = Color(0.55, 0.4, 0.25)
+        room_light.light_energy = 0.4
+        room_light.omni_range = 10.0
+        room_light.shadow_enabled = false
         add_child(room_light)
 
 
@@ -241,22 +242,26 @@ func _create_obstacle(position: Vector3, size: Vector3):
 func _add_lights():
         ## Add atmospheric lights along corridors
         var light_positions = [
-                Vector3(0, 2.8, -10),
+                Vector3(0, 2.8, -15),
+                Vector3(0, 2.8, -8),
                 Vector3(0, 2.8, 0),
-                Vector3(0, 2.8, 10),
-                Vector3(-15, 2.8, 0),
-                Vector3(15, 2.8, 0),
-                Vector3(-8, 2.8, -8),
-                Vector3(8, 2.8, 8),
+                Vector3(0, 2.8, 8),
+                Vector3(0, 2.8, 15),
+                Vector3(-15, 2.8, -8),
+                Vector3(-15, 2.8, 8),
+                Vector3(15, 2.8, -8),
+                Vector3(15, 2.8, 8),
+                Vector3(-8, 2.8, 0),
+                Vector3(8, 2.8, 0),
         ]
 
         for pos in light_positions:
                 var light = OmniLight3D.new()
                 light.position = pos
-                light.light_color = Color(0.5, 0.35, 0.2)  # Warm dim light
-                light.light_energy = 0.2
-                light.omni_range = 10.0
-                light.shadow_enabled = true
+                light.light_color = Color(0.6, 0.45, 0.25)  # Warm light
+                light.light_energy = 0.5
+                light.omni_range = 12.0
+                light.shadow_enabled = false  # Performance on mobile
                 add_child(light)
 
                 # Light fixture mesh (simple box)
