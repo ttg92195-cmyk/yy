@@ -1,6 +1,10 @@
 extends Node3D
-## GameScene - Main game scene controller
-## Manages spawning players, ghost, items, map generation, and game flow
+## GameScene - MOBILE-OPTIMIZED game scene controller
+## Optimizations:
+## - Simpler environment (no glow, lighter fog)
+## - Only 1 directional light (removed fill light)
+## - Smaller nav mesh
+## - Touch controls always created (not just on mobile)
 
 @export var use_ai_ghost: bool = true
 
@@ -18,7 +22,6 @@ var nav_region: NavigationRegion3D = null
 var map_generator: Node3D = null
 var players_container: Node3D = null
 var items_container: Node3D = null
-var escape_door_node: Node3D = null
 
 # HUD & Controls
 var hud: CanvasLayer = null
@@ -49,25 +52,24 @@ func _ready():
 	nav_region.name = "NavigationRegion3D"
 	add_child(nav_region)
 
-	# Create a simple navigation mesh
 	_create_nav_mesh()
 
-	# Find spawn points from map
+	# Find spawn points
 	_find_spawn_points()
 
-	# Setup World Environment - BRIGHT ENOUGH TO SEE ON MOBILE
+	# Setup environment (optimized for mobile)
 	_setup_environment()
 
 	# Setup HUD
 	_setup_hud()
 
-	# Setup touch controls for mobile
+	# Setup touch controls (always create - lightweight)
 	_setup_touch_controls()
 
 	# Connect game state signal
 	GameManager.game_state_changed.connect(_on_game_state_changed)
 
-	# Start the game immediately for AI ghost mode
+	# Start game in AI ghost mode
 	if use_ai_ghost:
 		GameManager.set_local_role("human")
 		GameManager.start_gameplay()
@@ -76,18 +78,17 @@ func _ready():
 
 
 func _create_nav_mesh():
-	## Create a basic navigation mesh for the floor area
 	var nav_mesh = NavigationMesh.new()
 	nav_mesh.agent_radius = 0.5
 	nav_mesh.agent_height = 1.8
 	nav_mesh.agent_max_climb = 0.4
 
-	# Define walkable area
+	# Smaller walkable area for 30x30 map
 	var vertices = PackedVector3Array([
-		Vector3(-24, 0.1, -24),
-		Vector3(24, 0.1, -24),
-		Vector3(24, 0.1, 24),
-		Vector3(-24, 0.1, 24),
+		Vector3(-14, 0.1, -14),
+		Vector3(14, 0.1, -14),
+		Vector3(14, 0.1, 14),
+		Vector3(-14, 0.1, 14),
 	])
 	nav_mesh.vertices = vertices
 
@@ -99,7 +100,6 @@ func _create_nav_mesh():
 
 
 func _find_spawn_points():
-	## Create spawn points
 	var spawn = Marker3D.new()
 	spawn.position = Vector3(0, 0, 0)
 	spawn.name = "SpawnPoint0"
@@ -118,83 +118,62 @@ func _find_spawn_points():
 	add_child(spawn2)
 	player_spawn_points.append(spawn2)
 
-	var spawn3 = Marker3D.new()
-	spawn3.position = Vector3(0, 0, 5)
-	spawn3.name = "SpawnPoint3"
-	add_child(spawn3)
-	player_spawn_points.append(spawn3)
-
-	# Ghost spawn point (far from players)
+	# Ghost spawn (far from players)
 	ghost_spawn_point = Marker3D.new()
-	ghost_spawn_point.position = Vector3(0, 0, -18)
+	ghost_spawn_point.position = Vector3(0, 0, -12)
 	ghost_spawn_point.name = "GhostSpawnPoint"
 	add_child(ghost_spawn_point)
 
 
 func _setup_environment():
-	## Setup the horror world environment - VISIBLE on mobile!
+	## MOBILE-OPTIMIZED environment
 	var world_env = WorldEnvironment.new()
 	world_env.name = "WorldEnvironment"
 
 	var env = Environment.new()
 
-	# Background - dark but not pure black
+	# Background
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.02, 0.02, 0.04, 1)
 
-	# Ambient light - CRITICAL: Must be bright enough to see walls/floor
-	# Use SKY_COLOR source for better results on mobile
+	# Ambient light - bright enough to see
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.15, 0.13, 0.18, 1)
+	env.ambient_light_color = Color(0.18, 0.15, 0.2, 1)
 	env.ambient_light_energy = 1.5
 
-	# Fog - LIGHT fog for horror atmosphere but still visible
+	# Fog - LIGHT for visibility
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.05, 0.05, 0.08, 1)
-	env.fog_light_energy = 0.8
-	env.fog_density = 0.008
-	env.fog_depth_begin = 15.0
-	env.fog_depth_end = 60.0
+	env.fog_light_energy = 0.6
+	env.fog_density = 0.01
+	env.fog_depth_begin = 10.0
+	env.fog_depth_end = 40.0
 
-	# Tone mapping - increase exposure for better visibility
+	# Tone mapping
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.tonemap_exposure = 1.5
-	env.tonemap_white = 6.0
+	env.tonemap_exposure = 1.3
+	env.tonemap_white = 4.0
 
-	# Glow for flashlight effects and item glows
-	env.glow_enabled = true
-	env.glow_intensity = 0.8
-	env.glow_strength = 0.8
-	env.glow_bloom = 0.3
-	env.glow_blend_mode = 0
+	# NO glow (saves GPU on mobile)
+	env.glow_enabled = false
 
-	# SSAO disabled for mobile performance
+	# NO SSAO
 	env.ssao_enabled = false
 
 	world_env.environment = env
 	add_child(world_env)
 
-	# Moonlight - brighter so players can see
+	# Single moonlight (removed fill light)
 	var dir_light = DirectionalLight3D.new()
 	dir_light.name = "MoonLight"
-	dir_light.light_energy = 0.4
+	dir_light.light_energy = 0.5
 	dir_light.light_color = Color(0.4, 0.4, 0.6)
 	dir_light.rotation = Vector3(deg_to_rad(-60), deg_to_rad(30), 0)
-	dir_light.shadow_enabled = false  # Performance on mobile
+	dir_light.shadow_enabled = false
 	add_child(dir_light)
-
-	# Add a secondary fill light from below for better visibility
-	var fill_light = DirectionalLight3D.new()
-	fill_light.name = "FillLight"
-	fill_light.light_energy = 0.15
-	fill_light.light_color = Color(0.2, 0.15, 0.25)
-	fill_light.rotation = Vector3(deg_to_rad(45), deg_to_rad(-30), 0)
-	fill_light.shadow_enabled = false
-	add_child(fill_light)
 
 
 func _setup_hud():
-	## Setup the game HUD
 	hud = CanvasLayer.new()
 	hud.name = "HUD"
 	hud.set_script(load("res://scripts/hud.gd"))
@@ -202,13 +181,11 @@ func _setup_hud():
 
 
 func _setup_touch_controls():
-	## Setup touch controls for mobile - ALWAYS create on Android
-	var is_mobile = OS.has_feature("android") or OS.has_feature("ios")
-	if is_mobile:
-		touch_controls = CanvasLayer.new()
-		touch_controls.name = "TouchControls"
-		touch_controls.set_script(load("res://scripts/touch_controls.gd"))
-		add_child(touch_controls)
+	## Always create touch controls (lightweight when not touching)
+	touch_controls = CanvasLayer.new()
+	touch_controls.name = "TouchControls"
+	touch_controls.set_script(load("res://scripts/touch_controls.gd"))
+	add_child(touch_controls)
 
 
 func _on_game_state_changed(new_state):
@@ -229,16 +206,12 @@ func _spawn_player(peer_id: int):
 	var player = PLAYER_SCENE.instantiate()
 	player.name = "Player_%d" % peer_id
 
-	# Set spawn position
 	if player_spawn_points.size() > 0:
 		var spawn_index = players_container.get_child_count() % player_spawn_points.size()
 		player.global_position = player_spawn_points[spawn_index].global_position
-		# Slightly above ground
 		player.position.y = 0.5
 
 	players_container.add_child(player)
-
-	# Setup as local player
 	player.setup_as_local(peer_id)
 	player.add_to_group("player")
 
@@ -271,7 +244,6 @@ func _spawn_ai_ghost():
 
 
 func _show_game_over(winner: String):
-	# Create game over overlay
 	var overlay = ColorRect.new()
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 
@@ -286,13 +258,13 @@ func _show_game_over(winner: String):
 	label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 64)
+	label.add_theme_font_size_override("font_size", 48)
 
 	if winner == "ghost":
-		label.text = "THE GHOST WINS!\nAll humans have been caught."
+		label.text = "THE GHOST WINS!"
 		label.add_theme_color_override("font_color", Color(1, 0.2, 0.2))
 	else:
-		label.text = "HUMANS ESCAPED!\nYou survived the ghost."
+		label.text = "HUMANS ESCAPED!"
 		label.add_theme_color_override("font_color", Color(0.2, 1, 0.2))
 
 	get_tree().root.add_child(label)
@@ -300,7 +272,7 @@ func _show_game_over(winner: String):
 	# Return to menu button
 	var button = Button.new()
 	button.text = "Return to Menu"
-	button.position = Vector2(get_viewport().size.x / 2 - 100, get_viewport().size.y / 2 + 100)
+	button.position = Vector2(get_viewport().size.x / 2 - 100, get_viewport().size.y / 2 + 80)
 	button.size = Vector2(200, 50)
 	button.pressed.connect(func():
 		GameManager.return_to_menu()

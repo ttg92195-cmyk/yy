@@ -1,6 +1,9 @@
 extends CanvasLayer
-## HUD - Horror themed heads-up display
-## Shows: Keys collected, flashlight battery, health, ghost proximity warning
+## HUD - MOBILE-OPTIMIZED horror heads-up display
+## Optimizations:
+## - Throttled _process (updates every 0.2s instead of every frame)
+## - Fixed ghost proximity detection bug
+## - Simpler warning animation
 
 # UI Elements
 var keys_container: HBoxContainer
@@ -16,8 +19,9 @@ var interact_prompt: Label
 
 # Animation
 var warning_anim_time: float = 0.0
-var health_flash_time: float = 0.0
 var is_ghost_near: bool = false
+var update_timer: float = 0.0
+var update_interval: float = 0.2  # Update every 0.2s instead of every frame
 
 func _ready():
 	layer = 5
@@ -25,15 +29,13 @@ func _ready():
 
 
 func _create_hud():
-	## Create the horror HUD layout
-
-	# ---- TOP AREA: Keys collected ----
+	# ---- TOP LEFT: Keys collected ----
 	var top_panel = Panel.new()
 	top_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	top_panel.offset_left = 10
-	top_panel.offset_right = 350
+	top_panel.offset_right = 280
 	top_panel.offset_top = 10
-	top_panel.offset_bottom = 65
+	top_panel.offset_bottom = 55
 	var top_style = StyleBoxFlat.new()
 	top_style.bg_color = Color(0.02, 0.01, 0.03, 0.7)
 	top_style.border_color = Color(0.3, 0.1, 0.1, 0.5)
@@ -48,21 +50,18 @@ func _create_hud():
 	top_panel.add_theme_stylebox_override("panel", top_style)
 	add_child(top_panel)
 
-	# Keys label
 	var keys_label = Label.new()
 	keys_label.text = "KEYS:"
 	keys_label.position = Vector2(10, 5)
-	keys_label.add_theme_font_size_override("font_size", 16)
+	keys_label.add_theme_font_size_override("font_size", 14)
 	keys_label.add_theme_color_override("font_color", Color(0.8, 0.7, 0.7))
 	top_panel.add_child(keys_label)
 
-	# Key indicators container
 	keys_container = HBoxContainer.new()
-	keys_container.position = Vector2(10, 28)
-	keys_container.add_theme_constant_override("separation", 8)
+	keys_container.position = Vector2(10, 25)
+	keys_container.add_theme_constant_override("separation", 6)
 	top_panel.add_child(keys_container)
 
-	# Create key indicators
 	_create_key_indicator("key_red", Color(1, 0.2, 0.2), "R")
 	_create_key_indicator("key_blue", Color(0.2, 0.4, 1), "B")
 	_create_key_indicator("key_green", Color(0.2, 1, 0.2), "G")
@@ -71,10 +70,10 @@ func _create_hud():
 	# ---- TOP RIGHT: Flashlight battery ----
 	var battery_panel = Panel.new()
 	battery_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	battery_panel.offset_left = -200
+	battery_panel.offset_left = -180
 	battery_panel.offset_right = -10
 	battery_panel.offset_top = 10
-	battery_panel.offset_bottom = 70
+	battery_panel.offset_bottom = 60
 	var batt_style = StyleBoxFlat.new()
 	batt_style.bg_color = Color(0.02, 0.01, 0.03, 0.7)
 	batt_style.border_color = Color(0.3, 0.1, 0.1, 0.5)
@@ -89,17 +88,16 @@ func _create_hud():
 	battery_panel.add_theme_stylebox_override("panel", batt_style)
 	add_child(battery_panel)
 
-	# Flashlight icon label
 	var flash_label = Label.new()
 	flash_label.text = "FLASHLIGHT"
 	flash_label.position = Vector2(10, 3)
-	flash_label.add_theme_font_size_override("font_size", 12)
+	flash_label.add_theme_font_size_override("font_size", 11)
 	flash_label.add_theme_color_override("font_color", Color(0.8, 0.7, 0.5))
 	battery_panel.add_child(flash_label)
 
 	battery_bar = ProgressBar.new()
-	battery_bar.position = Vector2(10, 22)
-	battery_bar.size = Vector2(170, 18)
+	battery_bar.position = Vector2(10, 20)
+	battery_bar.size = Vector2(150, 16)
 	battery_bar.min_value = 0
 	battery_bar.max_value = 100
 	battery_bar.value = 100
@@ -121,9 +119,9 @@ func _create_hud():
 	battery_panel.add_child(battery_bar)
 
 	battery_label = Label.new()
-	battery_label.position = Vector2(75, 23)
+	battery_label.position = Vector2(65, 21)
 	battery_label.text = "100%"
-	battery_label.add_theme_font_size_override("font_size", 12)
+	battery_label.add_theme_font_size_override("font_size", 11)
 	battery_label.add_theme_color_override("font_color", Color(0.9, 0.8, 0.5))
 	battery_panel.add_child(battery_label)
 
@@ -151,7 +149,7 @@ func _create_hud():
 	interact_prompt.offset_bottom = 55
 	interact_prompt.text = ""
 	interact_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	interact_prompt.add_theme_font_size_override("font_size", 18)
+	interact_prompt.add_theme_font_size_override("font_size", 16)
 	interact_prompt.add_theme_color_override("font_color", Color(1, 1, 0.7, 0.9))
 	interact_prompt.visible = false
 	add_child(interact_prompt)
@@ -161,7 +159,7 @@ func _create_hud():
 	ghost_warning.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	ghost_warning.offset_left = 50
 	ghost_warning.offset_right = -50
-	ghost_warning.offset_top = -40
+	ghost_warning.offset_top = -35
 	ghost_warning.offset_bottom = -5
 	ghost_warning.visible = false
 	var warn_style = StyleBoxFlat.new()
@@ -174,11 +172,11 @@ func _create_hud():
 	ghost_warning_label.text = "!! GHOST IS NEAR !!"
 	ghost_warning_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ghost_warning_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	ghost_warning_label.add_theme_font_size_override("font_size", 22)
+	ghost_warning_label.add_theme_font_size_override("font_size", 20)
 	ghost_warning_label.add_theme_color_override("font_color", Color(1, 0.2, 0.2))
 	ghost_warning.add_child(ghost_warning_label)
 
-	# ---- FULL SCREEN: Health overlay (red tint when hurt) ----
+	# ---- FULL SCREEN: Health overlay ----
 	health_overlay = ColorRect.new()
 	health_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	health_overlay.color = Color(0.5, 0, 0, 0)
@@ -192,15 +190,14 @@ func _create_hud():
 	status_label.offset_top = -30
 	status_label.offset_bottom = -5
 	status_label.text = ""
-	status_label.add_theme_font_size_override("font_size", 14)
+	status_label.add_theme_font_size_override("font_size", 13)
 	status_label.add_theme_color_override("font_color", Color(0.6, 0.5, 0.5))
 	add_child(status_label)
 
 
 func _create_key_indicator(key_name: String, color: Color, letter: String):
-	## Create a key indicator box
 	var indicator = Panel.new()
-	indicator.custom_minimum_size = Vector2(35, 25)
+	indicator.custom_minimum_size = Vector2(30, 22)
 	var style = StyleBoxFlat.new()
 	style.bg_color = Color(0.1, 0.1, 0.1, 0.8)
 	style.border_color = Color(0.2, 0.2, 0.2, 0.5)
@@ -215,14 +212,13 @@ func _create_key_indicator(key_name: String, color: Color, letter: String):
 	indicator.add_theme_stylebox_override("panel", style)
 	keys_container.add_child(indicator)
 
-	# Key letter
 	var letter_label = Label.new()
 	letter_label.text = letter
 	letter_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	letter_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	letter_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	letter_label.add_theme_font_size_override("font_size", 14)
-	letter_label.add_theme_color_override("font_color", Color(0.3, 0.3, 0.3))  # Dim when not collected
+	letter_label.add_theme_font_size_override("font_size", 13)
+	letter_label.add_theme_color_override("font_color", Color(0.3, 0.3, 0.3))
 	indicator.add_child(letter_label)
 
 	key_indicators[key_name] = {
@@ -234,13 +230,24 @@ func _create_key_indicator(key_name: String, color: Color, letter: String):
 
 
 func _process(delta):
+	# Throttle HUD updates to save CPU
+	update_timer += delta
+	if update_timer < update_interval:
+		# Still animate warning even between updates
+		if is_ghost_near:
+			warning_anim_time += delta
+			var alpha = (sin(warning_anim_time * 5.0) + 1.0) / 2.0
+			ghost_warning_label.add_theme_color_override("font_color", Color(1, 0.2 * alpha, 0.2 * alpha))
+		return
+
+	update_timer = 0.0
+
 	# Update battery bar
 	if battery_bar:
 		battery_bar.value = GameManager.flashlight_battery
 		if battery_label:
 			battery_label.text = "%.0f%%" % GameManager.flashlight_battery
 
-		# Color changes based on battery level
 		var fill_style = battery_bar.get_theme_stylebox("fill") as StyleBoxFlat
 		if fill_style:
 			if GameManager.flashlight_battery > 50:
@@ -256,7 +263,6 @@ func _process(delta):
 			var ki = key_indicators[key_name]
 			if GameManager.required_items[key_name] and not ki.collected:
 				ki.collected = true
-				# Light up the key indicator
 				var style = ki.panel.get_theme_stylebox("panel") as StyleBoxFlat
 				if style:
 					style.bg_color = Color(ki.color.r * 0.3, ki.color.g * 0.3, ki.color.b * 0.3, 0.9)
@@ -267,28 +273,25 @@ func _process(delta):
 					style.border_width_right = 2
 				ki.label.add_theme_color_override("font_color", ki.color)
 
-	# Check ghost proximity
+	# Check ghost proximity (FIXED bug)
 	var ghost = get_tree().get_first_node_in_group("ghost")
 	if ghost:
 		var players = get_tree().get_nodes_in_group("player")
+		var found_near = false
 		for player in players:
 			if player.is_local_player:
 				var dist = player.global_position.distance_to(ghost.global_position)
 				if dist < 15.0:
-					is_ghost_near = true
-					ghost_warning.visible = true
-					# Pulse warning
-					warning_anim_time += delta
-					var alpha = (sin(warning_anim_time * 5.0) + 1.0) / 2.0
-					ghost_warning_label.add_theme_color_override("font_color", Color(1, 0.2 * alpha, 0.2 * alpha))
-					var warn_style = ghost_warning.get_theme_stylebox("panel") as StyleBoxFlat
-					if warn_style:
-						warn_style.bg_color = Color(0.3, 0, 0, alpha * 0.3)
-				else:
-					is_ghost_near = false
-					ghost_warning.visible = false
-					warning_anim_time = 0.0
+					found_near = true
 				break
+
+		if found_near:
+			is_ghost_near = true
+			ghost_warning.visible = true
+		else:
+			is_ghost_near = false
+			ghost_warning.visible = false
+			warning_anim_time = 0.0
 	else:
 		ghost_warning.visible = false
 		is_ghost_near = false
@@ -299,12 +302,11 @@ func _process(delta):
 
 	# All keys collected message
 	if GameManager.escape_door_unlocked and status_label:
-		status_label.text = "All keys collected! Find the ESCAPE DOOR!"
+		status_label.text = "All keys collected! Find the EXIT!"
 		status_label.add_theme_color_override("font_color", Color(0.2, 1, 0.2))
 
 
 func show_damage_effect():
-	## Flash red when taking damage
 	health_overlay.color = Color(0.5, 0, 0, 0.4)
 
 
