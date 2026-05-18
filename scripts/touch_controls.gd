@@ -1,7 +1,8 @@
 extends CanvasLayer
-## TouchControls - Mobile touch controls for the game
+## TouchControls - Mobile touch controls for the game (LANDSCAPE optimized)
 ## Virtual joystick + action buttons for Android/iOS
 ## CRITICAL: Buttons use _gui_input and proper anchoring for reliable touch
+## Layout: Left side = Joystick, Right side = Buttons, Center = Camera look
 
 signal joystick_input(direction: Vector2)
 signal joystick_released()
@@ -10,9 +11,9 @@ signal joystick_released()
 var joystick_active: bool = false
 var joystick_start_pos: Vector2 = Vector2.ZERO
 var joystick_direction: Vector2 = Vector2.ZERO
-var joystick_max_distance: float = 80.0
+var joystick_max_distance: float = 65.0
 
-# UI Elements - use MarginContainer/Panel for proper anchoring
+# UI Elements
 var joystick_bg: Panel
 var joystick_knob: Panel
 var joystick_container: Control
@@ -21,7 +22,7 @@ var button_flashlight: Button
 var button_interact: Button
 
 # Look sensitivity
-var look_sensitivity: float = 0.004
+var look_sensitivity: float = 0.003
 var last_touch_pos: Vector2 = Vector2.ZERO
 
 # Touch tracking - separate IDs for joystick, look, and buttons
@@ -30,6 +31,10 @@ var look_touch_id: int = -1
 
 # Root control for layout
 var root_control: Control
+
+# Screen size cache
+var screen_width: float = 1280.0
+var screen_height: float = 720.0
 
 
 func _ready():
@@ -52,46 +57,46 @@ func _ready():
 
 
 func _create_joystick():
-	## Create virtual joystick on the left side using anchored controls
+	## Create virtual joystick on the left side - LANDSCAPE optimized
 	joystick_container = Control.new()
 	joystick_container.name = "JoystickContainer"
 	joystick_container.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	joystick_container.offset_left = 20
-	joystick_container.offset_top = -220
-	joystick_container.offset_right = 220
-	joystick_container.offset_bottom = -20
+	joystick_container.offset_left = 15
+	joystick_container.offset_top = -200
+	joystick_container.offset_right = 200
+	joystick_container.offset_bottom = -15
 	joystick_container.mouse_filter = Control.MOUSE_FILTER_PASS
 
-	# Background circle using Panel
+	# Background circle using Panel - larger for landscape
 	joystick_bg = Panel.new()
-	joystick_bg.position = Vector2(20, 20)
-	joystick_bg.size = Vector2(160, 160)
+	joystick_bg.position = Vector2(15, 15)
+	joystick_bg.size = Vector2(140, 140)
 	joystick_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	# Style for background
 	var bg_style = StyleBoxFlat.new()
-	bg_style.bg_color = Color(1, 1, 1, 0.12)
-	bg_style.border_color = Color(1, 1, 1, 0.2)
+	bg_style.bg_color = Color(1, 1, 1, 0.08)
+	bg_style.border_color = Color(1, 1, 1, 0.15)
 	bg_style.border_width_bottom = 2
 	bg_style.border_width_top = 2
 	bg_style.border_width_left = 2
 	bg_style.border_width_right = 2
-	bg_style.corner_radius_top_left = 80
-	bg_style.corner_radius_top_right = 80
-	bg_style.corner_radius_bottom_left = 80
-	bg_style.corner_radius_bottom_right = 80
+	bg_style.corner_radius_top_left = 70
+	bg_style.corner_radius_top_right = 70
+	bg_style.corner_radius_bottom_left = 70
+	bg_style.corner_radius_bottom_right = 70
 	joystick_bg.add_theme_stylebox_override("panel", bg_style)
 	joystick_container.add_child(joystick_bg)
 
-	# Knob (draggable circle)
+	# Knob (draggable circle) - larger for landscape
 	joystick_knob = Panel.new()
-	joystick_knob.position = Vector2(75, 75)
+	joystick_knob.position = Vector2(60, 60)
 	joystick_knob.size = Vector2(50, 50)
 	joystick_knob.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	# Style for knob
 	var knob_style = StyleBoxFlat.new()
-	knob_style.bg_color = Color(1, 1, 1, 0.5)
+	knob_style.bg_color = Color(1, 1, 1, 0.45)
 	knob_style.corner_radius_top_left = 25
 	knob_style.corner_radius_top_right = 25
 	knob_style.corner_radius_bottom_left = 25
@@ -104,77 +109,80 @@ func _create_joystick():
 
 
 func _create_buttons():
-	## Create action buttons on the right side using anchored positioning
-	# Use a container anchored to bottom-right
+	## Create action buttons on the right side - LANDSCAPE optimized layout
+	# Button container anchored to bottom-right
 	var btn_container = Control.new()
 	btn_container.name = "ButtonContainer"
 	btn_container.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	btn_container.offset_left = -250
-	btn_container.offset_top = -250
+	btn_container.offset_left = -220
+	btn_container.offset_top = -180
 	btn_container.offset_right = -10
 	btn_container.offset_bottom = -10
 	btn_container.mouse_filter = Control.MOUSE_FILTER_PASS
 
-	var btn_size = Vector2(72, 72)
+	# Larger buttons for landscape
+	var btn_size = Vector2(64, 64)
 
 	# Button style
 	var btn_style = StyleBoxFlat.new()
-	btn_style.bg_color = Color(0.2, 0.2, 0.3, 0.6)
-	btn_style.border_color = Color(0.5, 0.5, 0.7, 0.8)
+	btn_style.bg_color = Color(0.2, 0.2, 0.3, 0.55)
+	btn_style.border_color = Color(0.5, 0.5, 0.7, 0.7)
 	btn_style.border_width_bottom = 2
 	btn_style.border_width_top = 2
 	btn_style.border_width_left = 2
 	btn_style.border_width_right = 2
-	btn_style.corner_radius_top_left = 36
-	btn_style.corner_radius_top_right = 36
-	btn_style.corner_radius_bottom_left = 36
-	btn_style.corner_radius_bottom_right = 36
+	btn_style.corner_radius_top_left = 32
+	btn_style.corner_radius_top_right = 32
+	btn_style.corner_radius_bottom_left = 32
+	btn_style.corner_radius_bottom_right = 32
 
-	# Sprint button (top-left of button area)
+	# ---- Bottom row: SPRINT + INTERACT side by side ----
+
+	# Sprint button (bottom-left of button area)
 	button_sprint = Button.new()
 	button_sprint.text = "RUN"
-	button_sprint.position = Vector2(10, 60)
+	button_sprint.position = Vector2(5, 80)
 	button_sprint.size = btn_size
 	button_sprint.add_theme_stylebox_override("normal", btn_style.duplicate())
 	button_sprint.add_theme_stylebox_override("pressed", _create_pressed_style(Color(0.3, 0.6, 0.3, 0.7)))
-	button_sprint.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
-	button_sprint.add_theme_font_size_override("font_size", 16)
+	button_sprint.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
+	button_sprint.add_theme_font_size_override("font_size", 14)
 	# Sprint is held down, so use button_down/button_up
 	button_sprint.button_down.connect(func(): Input.action_press("sprint"))
 	button_sprint.button_up.connect(func(): Input.action_release("sprint"))
 	btn_container.add_child(button_sprint)
 
-	# Flashlight button (top-right of button area) - TOGGLE
-	var flash_style = btn_style.duplicate()
-	flash_style.bg_color = Color(0.4, 0.35, 0.1, 0.6)
-	flash_style.border_color = Color(0.8, 0.7, 0.2, 0.8)
-
-	button_flashlight = Button.new()
-	button_flashlight.text = "LIGHT"
-	button_flashlight.position = Vector2(95, 60)
-	button_flashlight.size = btn_size
-	button_flashlight.add_theme_stylebox_override("normal", flash_style)
-	button_flashlight.add_theme_stylebox_override("pressed", _create_pressed_style(Color(0.8, 0.7, 0.2, 0.8)))
-	button_flashlight.add_theme_color_override("font_color", Color(1, 1, 0.7, 0.9))
-	button_flashlight.add_theme_font_size_override("font_size", 14)
-	button_flashlight.pressed.connect(_on_flashlight_pressed)
-	btn_container.add_child(button_flashlight)
-
-	# Interact button (bottom-center)
+	# Interact button (bottom-right of button area)
 	var interact_style = btn_style.duplicate()
-	interact_style.bg_color = Color(0.1, 0.3, 0.4, 0.6)
-	interact_style.border_color = Color(0.2, 0.6, 0.8, 0.8)
+	interact_style.bg_color = Color(0.1, 0.3, 0.4, 0.55)
+	interact_style.border_color = Color(0.2, 0.6, 0.8, 0.7)
 
 	button_interact = Button.new()
 	button_interact.text = "USE"
-	button_interact.position = Vector2(55, 145)
+	button_interact.position = Vector2(78, 80)
 	button_interact.size = btn_size
 	button_interact.add_theme_stylebox_override("normal", interact_style)
 	button_interact.add_theme_stylebox_override("pressed", _create_pressed_style(Color(0.2, 0.6, 0.8, 0.8)))
-	button_interact.add_theme_color_override("font_color", Color(0.7, 1, 1, 0.9))
-	button_interact.add_theme_font_size_override("font_size", 16)
+	button_interact.add_theme_color_override("font_color", Color(0.7, 1, 1, 0.85))
+	button_interact.add_theme_font_size_override("font_size", 14)
 	button_interact.pressed.connect(_on_interact_pressed)
 	btn_container.add_child(button_interact)
+
+	# ---- Top: FLASHLIGHT button (centered above bottom row) ----
+	var flash_style = btn_style.duplicate()
+	flash_style.bg_color = Color(0.4, 0.35, 0.1, 0.55)
+	flash_style.border_color = Color(0.8, 0.7, 0.2, 0.7)
+
+	button_flashlight = Button.new()
+	button_flashlight.text = "LIGHT"
+	button_flashlight.position = Vector2(40, 8)
+	button_flashlight.size = btn_size
+	button_flashlight.add_theme_stylebox_override("normal", flash_style)
+	button_flashlight.add_theme_stylebox_override("pressed", _create_pressed_style(Color(0.8, 0.7, 0.2, 0.8)))
+	button_flashlight.add_theme_color_override("font_color", Color(1, 1, 0.7, 0.85))
+	button_flashlight.add_theme_font_size_override("font_size", 12)
+	button_flashlight.pressed.connect(_on_flashlight_pressed)
+	btn_container.add_child(button_flashlight)
 
 	root_control.add_child(btn_container)
 
@@ -182,16 +190,15 @@ func _create_buttons():
 func _create_pressed_style(color: Color) -> StyleBoxFlat:
 	var style = StyleBoxFlat.new()
 	style.bg_color = color
-	style.corner_radius_top_left = 36
-	style.corner_radius_top_right = 36
-	style.corner_radius_bottom_left = 36
-	style.corner_radius_bottom_right = 36
+	style.corner_radius_top_left = 32
+	style.corner_radius_top_right = 32
+	style.corner_radius_bottom_left = 32
+	style.corner_radius_bottom_right = 32
 	return style
 
 
 func _on_flashlight_pressed():
 	## Toggle flashlight - use Input action so player_controller picks it up
-	print("[TouchControls] Flashlight button pressed!")
 	Input.action_press("flashlight")
 	# Release after a short delay so it registers as a "pressed" event
 	await get_tree().create_timer(0.05).timeout
@@ -200,7 +207,6 @@ func _on_flashlight_pressed():
 
 func _on_interact_pressed():
 	## Trigger interact action
-	print("[TouchControls] Interact button pressed!")
 	Input.action_press("interact")
 	await get_tree().create_timer(0.05).timeout
 	Input.action_release("interact")
@@ -218,16 +224,17 @@ func _input(event: InputEvent):
 
 
 func _handle_touch(event: InputEventScreenTouch):
-	var screen_width = DisplayServer.window_get_size().x
-	var screen_height = DisplayServer.window_get_size().y
+	# Update screen size cache
+	screen_width = DisplayServer.window_get_size().x
+	screen_height = DisplayServer.window_get_size().y
 
 	# Check if touch is on a button - if so, let the button handle it
 	if _is_on_button(event.position):
 		return  # Don't process - let button signals handle it
 
 	if event.pressed:
-		# Left 40% of screen = joystick area
-		if event.position.x < screen_width * 0.4 and event.position.y > screen_height * 0.4:
+		# Left 35% of screen, bottom 60% = joystick area (landscape)
+		if event.position.x < screen_width * 0.35 and event.position.y > screen_height * 0.35:
 			joystick_touch_id = event.index
 			joystick_active = true
 			_update_joystick(event.position)
