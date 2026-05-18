@@ -1,0 +1,74 @@
+name: Godot Build & Export
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  GODOT_VERSION: "4.3"
+  GODOT_RELEASE: "stable"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [android, windows, linux]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Godot
+        uses: abarichello/godot-ci@4.3.0
+
+      - name: Import Godot Project
+        run: godot --headless --import
+
+      - name: Build for Android
+        if: matrix.target == 'android'
+        run: |
+          mkdir -p ./build/android
+          godot --headless --export-debug "Android" ./build/android/the-ghost.apk
+
+      - name: Build for Windows
+        if: matrix.target == 'windows'
+        run: |
+          mkdir -p ./build/windows
+          godot --headless --export-debug "Windows Desktop" ./build/windows/TheGhost.exe
+
+      - name: Build for Linux
+        if: matrix.target == 'linux'
+        run: |
+          mkdir -p ./build/linux
+          godot --headless --export-debug "Linux/X11" ./build/linux/TheGhost.x86_64
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: the-ghost-${{ matrix.target }}
+          path: ./build/
+          retention-days: 30
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v0.1.${{ github.run_number }}
+          name: "The Ghost - Build #${{ github.run_number }}"
+          files: ./artifacts/**/*
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

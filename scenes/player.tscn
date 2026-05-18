@@ -1,0 +1,49 @@
+[gd_scene load_steps=3 format=3 uid="uid://player_scene"]
+
+[ext_resource type="Script" path="res://scripts/player_controller.gd" id="1"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_player"]
+radius = 0.4
+height = 1.8
+
+[node name="Player" type="CharacterBody3D"]
+collision_layer = 2
+collision_mask = 21
+script = ExtResource("1")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_player")
+
+[node name="Head" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+
+[node name="Camera3D" type="Camera3D" parent="Head"]
+current = true
+fov = 75.0
+
+[node name="Flashlight" type="SpotLight3D" parent="Head/Camera3D"]
+visible = true
+light_energy = 2.5
+spot_range = 20.0
+spot_angle = 40.0
+spot_attenuation = 0.5
+shadow_enabled = true
+
+[node name="InteractRay" type="RayCast3D" parent="Head/Camera3D"]
+target_position = Vector3(0, 0, -3)
+collision_mask = 16
+
+[node name="InteractLabel" type="Label3D" parent="Head/Camera3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.3, -1)
+text = "[E] Interact"
+billboard = 1
+
+[node name="StepAudio" type="AudioStreamPlayer3D" parent="."]
+max_distance = 15.0
+
+[node name="HeartbeatAudio" type="AudioStreamPlayer3D" parent="."]
+max_distance = 5.0
+
+[node name="BodyMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)

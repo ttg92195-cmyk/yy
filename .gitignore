@@ -1,0 +1,26 @@
+# Godot 4+ specific ignores
+.godot/
+*.tmp
+*.import
+
+# Build outputs
+build/
+export/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Keystore files (NEVER commit these!)
+*.keystore
+*.jks
+
+# Env files
+.env
+.env.local
