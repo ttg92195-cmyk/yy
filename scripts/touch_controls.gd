@@ -1,6 +1,7 @@
 extends CanvasLayer
 ## TouchControls - Mobile touch controls for the game
 ## Virtual joystick + action buttons for Android/iOS
+## CRITICAL: Buttons use _gui_input and proper anchoring for reliable touch
 
 signal joystick_input(direction: Vector2)
 signal joystick_released()
@@ -11,216 +12,309 @@ var joystick_start_pos: Vector2 = Vector2.ZERO
 var joystick_direction: Vector2 = Vector2.ZERO
 var joystick_max_distance: float = 80.0
 
-# UI Elements
-var joystick_bg: ColorRect
-var joystick_knob: ColorRect
+# UI Elements - use MarginContainer/Panel for proper anchoring
+var joystick_bg: Panel
+var joystick_knob: Panel
 var joystick_container: Control
 var button_sprint: Button
 var button_flashlight: Button
 var button_interact: Button
-var button_look_area: Control
 
 # Look sensitivity
-var look_sensitivity: float = 0.003
+var look_sensitivity: float = 0.004
 var last_touch_pos: Vector2 = Vector2.ZERO
 
-# Touch tracking
+# Touch tracking - separate IDs for joystick, look, and buttons
 var joystick_touch_id: int = -1
 var look_touch_id: int = -1
 
+# Root control for layout
+var root_control: Control
+
 
 func _ready():
-        # Only show on mobile
-        var is_mobile = OS.has_feature("android") or OS.has_feature("ios")
-        if not is_mobile:
-                # Still create but hide - useful for testing
-                pass
+	# Only show on mobile
+	var is_mobile = OS.has_feature("android") or OS.has_feature("ios")
+	if not is_mobile:
+		# Still create but hide for testing
+		pass
 
-        layer = 10  # Above game UI
-        _create_joystick()
-        _create_buttons()
-        _create_look_area()
+	layer = 10  # Above game UI
+
+	# Create root control with full rect
+	root_control = Control.new()
+	root_control.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root_control.name = "TouchRoot"
+	add_child(root_control)
+
+	_create_joystick()
+	_create_buttons()
 
 
 func _create_joystick():
-        ## Create virtual joystick on the left side
-        joystick_container = Control.new()
-        joystick_container.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-        joystick_container.offset_left = 30
-        joystick_container.offset_top = -200
-        joystick_container.offset_right = 230
-        joystick_container.offset_bottom = -30
-        joystick_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	## Create virtual joystick on the left side using anchored controls
+	joystick_container = Control.new()
+	joystick_container.name = "JoystickContainer"
+	joystick_container.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	joystick_container.offset_left = 20
+	joystick_container.offset_top = -220
+	joystick_container.offset_right = 220
+	joystick_container.offset_bottom = -20
+	joystick_container.mouse_filter = Control.MOUSE_FILTER_PASS
 
-        # Background circle
-        joystick_bg = ColorRect.new()
-        joystick_bg.position = Vector2(30, 30)
-        joystick_bg.size = Vector2(140, 140)
-        joystick_bg.color = Color(1, 1, 1, 0.15)
-        joystick_container.add_child(joystick_bg)
+	# Background circle using Panel
+	joystick_bg = Panel.new()
+	joystick_bg.position = Vector2(20, 20)
+	joystick_bg.size = Vector2(160, 160)
+	joystick_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-        # Knob (draggable circle)
-        joystick_knob = ColorRect.new()
-        joystick_knob.position = Vector2(75, 75)
-        joystick_knob.size = Vector2(50, 50)
-        joystick_knob.color = Color(1, 1, 1, 0.4)
-        joystick_container.add_child(joystick_knob)
+	# Style for background
+	var bg_style = StyleBoxFlat.new()
+	bg_style.bg_color = Color(1, 1, 1, 0.12)
+	bg_style.border_color = Color(1, 1, 1, 0.2)
+	bg_style.border_width_bottom = 2
+	bg_style.border_width_top = 2
+	bg_style.border_width_left = 2
+	bg_style.border_width_right = 2
+	bg_style.corner_radius_top_left = 80
+	bg_style.corner_radius_top_right = 80
+	bg_style.corner_radius_bottom_left = 80
+	bg_style.corner_radius_bottom_right = 80
+	joystick_bg.add_theme_stylebox_override("panel", bg_style)
+	joystick_container.add_child(joystick_bg)
 
-        joystick_start_pos = joystick_knob.position
-        add_child(joystick_container)
+	# Knob (draggable circle)
+	joystick_knob = Panel.new()
+	joystick_knob.position = Vector2(75, 75)
+	joystick_knob.size = Vector2(50, 50)
+	joystick_knob.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Style for knob
+	var knob_style = StyleBoxFlat.new()
+	knob_style.bg_color = Color(1, 1, 1, 0.5)
+	knob_style.corner_radius_top_left = 25
+	knob_style.corner_radius_top_right = 25
+	knob_style.corner_radius_bottom_left = 25
+	knob_style.corner_radius_bottom_right = 25
+	joystick_knob.add_theme_stylebox_override("panel", knob_style)
+	joystick_container.add_child(joystick_knob)
+
+	joystick_start_pos = joystick_knob.position
+	root_control.add_child(joystick_container)
 
 
 func _create_buttons():
-        ## Create action buttons on the right side
-        var btn_size = Vector2(70, 70)
-        var right_offset = 20
+	## Create action buttons on the right side using anchored positioning
+	# Use a container anchored to bottom-right
+	var btn_container = Control.new()
+	btn_container.name = "ButtonContainer"
+	btn_container.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	btn_container.offset_left = -250
+	btn_container.offset_top = -250
+	btn_container.offset_right = -10
+	btn_container.offset_bottom = -10
+	btn_container.mouse_filter = Control.MOUSE_FILTER_PASS
 
-        # Sprint button
-        button_sprint = Button.new()
-        button_sprint.text = "🏃"
-        button_sprint.position = Vector2(
-                DisplayServer.window_get_size().x - btn_size.x - right_offset - 80,
-                DisplayServer.window_get_size().y - btn_size.y - 160
-        )
-        button_sprint.size = btn_size
-        button_sprint.modulate = Color(1, 1, 1, 0.6)
-        button_sprint.pressed.connect(func(): Input.action_press("sprint"))
-        button_sprint.button_up.connect(func(): Input.action_release("sprint"))
-        add_child(button_sprint)
+	var btn_size = Vector2(72, 72)
 
-        # Flashlight button (toggle - press once to on/off)
-        button_flashlight = Button.new()
-        button_flashlight.text = "🔦"
-        button_flashlight.position = Vector2(
-                DisplayServer.window_get_size().x - btn_size.x - right_offset,
-                DisplayServer.window_get_size().y - btn_size.y - 160
-        )
-        button_flashlight.size = btn_size
-        button_flashlight.modulate = Color(1, 1, 0.5, 0.7)
-        button_flashlight.pressed.connect(_on_flashlight_pressed)
-        add_child(button_flashlight)
+	# Button style
+	var btn_style = StyleBoxFlat.new()
+	btn_style.bg_color = Color(0.2, 0.2, 0.3, 0.6)
+	btn_style.border_color = Color(0.5, 0.5, 0.7, 0.8)
+	btn_style.border_width_bottom = 2
+	btn_style.border_width_top = 2
+	btn_style.border_width_left = 2
+	btn_style.border_width_right = 2
+	btn_style.corner_radius_top_left = 36
+	btn_style.corner_radius_top_right = 36
+	btn_style.corner_radius_bottom_left = 36
+	btn_style.corner_radius_bottom_right = 36
 
-        # Interact button (single press)
-        button_interact = Button.new()
-        button_interact.text = "E"
-        button_interact.position = Vector2(
-                DisplayServer.window_get_size().x - btn_size.x - right_offset - 40,
-                DisplayServer.window_get_size().y - btn_size.y - 80
-        )
-        button_interact.size = btn_size
-        button_interact.modulate = Color(1, 1, 0.5, 0.7)
-        button_interact.pressed.connect(_on_interact_pressed)
-        add_child(button_interact)
+	# Sprint button (top-left of button area)
+	button_sprint = Button.new()
+	button_sprint.text = "RUN"
+	button_sprint.position = Vector2(10, 60)
+	button_sprint.size = btn_size
+	button_sprint.add_theme_stylebox_override("normal", btn_style.duplicate())
+	button_sprint.add_theme_stylebox_override("pressed", _create_pressed_style(Color(0.3, 0.6, 0.3, 0.7)))
+	button_sprint.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
+	button_sprint.add_theme_font_size_override("font_size", 16)
+	# Sprint is held down, so use button_down/button_up
+	button_sprint.button_down.connect(func(): Input.action_press("sprint"))
+	button_sprint.button_up.connect(func(): Input.action_release("sprint"))
+	btn_container.add_child(button_sprint)
+
+	# Flashlight button (top-right of button area) - TOGGLE
+	var flash_style = btn_style.duplicate()
+	flash_style.bg_color = Color(0.4, 0.35, 0.1, 0.6)
+	flash_style.border_color = Color(0.8, 0.7, 0.2, 0.8)
+
+	button_flashlight = Button.new()
+	button_flashlight.text = "LIGHT"
+	button_flashlight.position = Vector2(95, 60)
+	button_flashlight.size = btn_size
+	button_flashlight.add_theme_stylebox_override("normal", flash_style)
+	button_flashlight.add_theme_stylebox_override("pressed", _create_pressed_style(Color(0.8, 0.7, 0.2, 0.8)))
+	button_flashlight.add_theme_color_override("font_color", Color(1, 1, 0.7, 0.9))
+	button_flashlight.add_theme_font_size_override("font_size", 14)
+	button_flashlight.pressed.connect(_on_flashlight_pressed)
+	btn_container.add_child(button_flashlight)
+
+	# Interact button (bottom-center)
+	var interact_style = btn_style.duplicate()
+	interact_style.bg_color = Color(0.1, 0.3, 0.4, 0.6)
+	interact_style.border_color = Color(0.2, 0.6, 0.8, 0.8)
+
+	button_interact = Button.new()
+	button_interact.text = "USE"
+	button_interact.position = Vector2(55, 145)
+	button_interact.size = btn_size
+	button_interact.add_theme_stylebox_override("normal", interact_style)
+	button_interact.add_theme_stylebox_override("pressed", _create_pressed_style(Color(0.2, 0.6, 0.8, 0.8)))
+	button_interact.add_theme_color_override("font_color", Color(0.7, 1, 1, 0.9))
+	button_interact.add_theme_font_size_override("font_size", 16)
+	button_interact.pressed.connect(_on_interact_pressed)
+	btn_container.add_child(button_interact)
+
+	root_control.add_child(btn_container)
 
 
-func _create_look_area():
-        ## Create an invisible touch area for camera look on the right half
-        button_look_area = Control.new()
-        button_look_area.set_anchors_preset(Control.PRESET_FULL_RECT)
-        button_look_area.mouse_filter = Control.MOUSE_FILTER_PASS
-        button_look_area.z_index = -1
-        add_child(button_look_area)
+func _create_pressed_style(color: Color) -> StyleBoxFlat:
+	var style = StyleBoxFlat.new()
+	style.bg_color = color
+	style.corner_radius_top_left = 36
+	style.corner_radius_top_right = 36
+	style.corner_radius_bottom_left = 36
+	style.corner_radius_bottom_right = 36
+	return style
 
 
 func _on_flashlight_pressed():
-        ## Toggle flashlight directly - find the player and call toggle
-        var players = get_tree().get_nodes_in_group("player")
-        for player in players:
-                if player.is_local_player and player.has_method("toggle_flashlight"):
-                        player.toggle_flashlight()
-                        break
+	## Toggle flashlight - use Input action so player_controller picks it up
+	print("[TouchControls] Flashlight button pressed!")
+	Input.action_press("flashlight")
+	# Release after a short delay so it registers as a "pressed" event
+	await get_tree().create_timer(0.05).timeout
+	Input.action_release("flashlight")
 
 
 func _on_interact_pressed():
-        ## Trigger interact action
-        Input.action_press("interact")
-        await get_tree().create_timer(0.1).timeout
-        Input.action_release("interact")
+	## Trigger interact action
+	print("[TouchControls] Interact button pressed!")
+	Input.action_press("interact")
+	await get_tree().create_timer(0.05).timeout
+	Input.action_release("interact")
 
 
 func _input(event: InputEvent):
-        if event is InputEventScreenTouch:
-                _handle_touch(event)
-        elif event is InputEventScreenDrag:
-                _handle_drag(event)
+	## Handle touch input for joystick and camera look
+	## Buttons handle their own input via Button signals, so we only
+	## handle the joystick area (left side) and look area (right side, not on buttons)
+
+	if event is InputEventScreenTouch:
+		_handle_touch(event)
+	elif event is InputEventScreenDrag:
+		_handle_drag(event)
 
 
 func _handle_touch(event: InputEventScreenTouch):
-        var screen_center_x = DisplayServer.window_get_size().x / 2.0
+	var screen_width = DisplayServer.window_get_size().x
+	var screen_height = DisplayServer.window_get_size().y
 
-        if event.pressed:
-                if event.position.x < screen_center_x:
-                        # Left side - joystick
-                        joystick_touch_id = event.index
-                        joystick_active = true
-                        _update_joystick(event.position)
-                else:
-                        # Right side - look
-                        look_touch_id = event.index
-                        last_touch_pos = event.position
-        else:
-                if event.index == joystick_touch_id:
-                        joystick_touch_id = -1
-                        joystick_active = false
-                        joystick_direction = Vector2.ZERO
-                        joystick_knob.position = joystick_start_pos
-                        joystick_input.emit(Vector2.ZERO)
-                        # Release movement inputs
-                        Input.action_release("move_forward")
-                        Input.action_release("move_backward")
-                        Input.action_release("move_left")
-                        Input.action_release("move_right")
-                elif event.index == look_touch_id:
-                        look_touch_id = -1
+	# Check if touch is on a button - if so, let the button handle it
+	if _is_on_button(event.position):
+		return  # Don't process - let button signals handle it
+
+	if event.pressed:
+		# Left 40% of screen = joystick area
+		if event.position.x < screen_width * 0.4 and event.position.y > screen_height * 0.4:
+			joystick_touch_id = event.index
+			joystick_active = true
+			_update_joystick(event.position)
+		else:
+			# Right side or top = look
+			if joystick_touch_id == -1:  # Don't override joystick touch
+				look_touch_id = event.index
+				last_touch_pos = event.position
+	else:
+		if event.index == joystick_touch_id:
+			joystick_touch_id = -1
+			joystick_active = false
+			joystick_direction = Vector2.ZERO
+			joystick_knob.position = joystick_start_pos
+			joystick_input.emit(Vector2.ZERO)
+			# Release movement inputs
+			Input.action_release("move_forward")
+			Input.action_release("move_backward")
+			Input.action_release("move_left")
+			Input.action_release("move_right")
+		elif event.index == look_touch_id:
+			look_touch_id = -1
 
 
 func _handle_drag(event: InputEventScreenDrag):
-        if event.index == joystick_touch_id:
-                _update_joystick(event.position)
-        elif event.index == look_touch_id:
-                # Camera look
-                var delta = event.position - last_touch_pos
-                last_touch_pos = event.position
+	if event.index == joystick_touch_id:
+		_update_joystick(event.position)
+	elif event.index == look_touch_id:
+		# Camera look - simulate mouse motion
+		var delta = event.position - last_touch_pos
+		last_touch_pos = event.position
 
-                # Simulate mouse motion for camera
-                var motion_event = InputEventMouseMotion.new()
-                motion_event.relative = delta
-                Input.parse_input_event(motion_event)
+		# Find local player and rotate directly
+		var players = get_tree().get_nodes_in_group("player")
+		for player in players:
+			if player.is_local_player:
+				player.rotate_y(-delta.x * look_sensitivity)
+				if player.head:
+					player.head.rotate_x(-delta.y * look_sensitivity)
+					player.head.rotation.x = clamp(player.head.rotation.x, deg_to_rad(-89), deg_to_rad(89))
+				break
+
+
+func _is_on_button(pos: Vector2) -> bool:
+	## Check if a touch position is over any of our buttons
+	if button_sprint and button_sprint.get_global_rect().has_point(pos):
+		return true
+	if button_flashlight and button_flashlight.get_global_rect().has_point(pos):
+		return true
+	if button_interact and button_interact.get_global_rect().has_point(pos):
+		return true
+	return false
 
 
 func _update_joystick(touch_pos: Vector2):
-        ## Update joystick position and direction
-        var center = Vector2(
-                joystick_bg.position.x + joystick_bg.size.x / 2.0,
-                joystick_bg.position.y + joystick_bg.size.y / 2.0
-        )
+	## Update joystick position and direction
+	var center = Vector2(
+		joystick_bg.position.x + joystick_bg.size.x / 2.0,
+		joystick_bg.position.y + joystick_bg.size.y / 2.0
+	)
 
-        # Convert to local coordinates
-        var local_pos = touch_pos - joystick_container.global_position
-        var diff = local_pos - center
-        var dist = diff.length()
+	# Convert to local coordinates
+	var local_pos = touch_pos - joystick_container.global_position
+	var diff = local_pos - center
+	var dist = diff.length()
 
-        if dist > joystick_max_distance:
-                diff = diff.normalized() * joystick_max_distance
+	if dist > joystick_max_distance:
+		diff = diff.normalized() * joystick_max_distance
 
-        # Update knob position
-        joystick_knob.position = center + diff - joystick_knob.size / 2.0
+	# Update knob position
+	joystick_knob.position = center + diff - joystick_knob.size / 2.0
 
-        # Calculate direction (-1 to 1)
-        joystick_direction = diff / joystick_max_distance
-        joystick_input.emit(joystick_direction)
+	# Calculate direction (-1 to 1)
+	joystick_direction = diff / joystick_max_distance
+	joystick_input.emit(joystick_direction)
 
-        # Simulate keyboard inputs
-        Input.action_release("move_forward")
-        Input.action_release("move_backward")
-        Input.action_release("move_left")
-        Input.action_release("move_right")
+	# Simulate keyboard inputs
+	Input.action_release("move_forward")
+	Input.action_release("move_backward")
+	Input.action_release("move_left")
+	Input.action_release("move_right")
 
-        if joystick_direction.y < -0.3:
-                Input.action_press("move_forward")
-        if joystick_direction.y > 0.3:
-                Input.action_press("move_backward")
-        if joystick_direction.x < -0.3:
-                Input.action_press("move_left")
-        if joystick_direction.x > 0.3:
-                Input.action_press("move_right")
+	if joystick_direction.y < -0.25:
+		Input.action_press("move_forward")
+	if joystick_direction.y > 0.25:
+		Input.action_press("move_backward")
+	if joystick_direction.x < -0.25:
+		Input.action_press("move_left")
+	if joystick_direction.x > 0.25:
+		Input.action_press("move_right")
