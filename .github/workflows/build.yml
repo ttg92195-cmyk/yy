@@ -47,20 +47,40 @@ jobs:
       - name: Build for Windows
         if: matrix.target == 'windows'
         run: |
-          mkdir -p ./build/windows
-          ./godot_editor --headless --export-debug "Windows Desktop" ./build/windows/TheGhost.exe
+          mkdir -p ./build
+          ./godot_editor --headless --export-debug "Windows Desktop" ./build/TheGhost_Windows.exe
 
       - name: Build for Linux
         if: matrix.target == 'linux'
         run: |
-          mkdir -p ./build/linux
-          ./godot_editor --headless --export-debug "Linux/X11" ./build/linux/TheGhost.x86_64
+          mkdir -p ./build
+          ./godot_editor --headless --export-debug "Linux/X11" ./build/TheGhost_Linux.x86_64
+
+      - name: Rename files to avoid conflicts
+        run: |
+          cd ./build
+          for f in *.pck *.console.* *.sh; do
+            if [ -f "$f" ]; then
+              if [ "${{ matrix.target }}" = "windows" ]; then
+                mv "$f" "${f%.pck}_Windows.pck" 2>/dev/null || mv "$f" "Windows_$f" 2>/dev/null || true
+              else
+                mv "$f" "${f%.pck}_Linux.pck" 2>/dev/null || mv "$f" "Linux_$f" 2>/dev/null || true
+              fi
+            fi
+          done
+          ls -la
+
+      - name: Zip build output
+        run: |
+          cd ./build
+          zip -r ../the-ghost-${{ matrix.target }}.zip .
+          ls -la ..
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: the-ghost-${{ matrix.target }}
-          path: ./build/
+          path: ./the-ghost-${{ matrix.target }}.zip
           retention-days: 30
 
   release:
@@ -75,12 +95,15 @@ jobs:
         with:
           path: ./artifacts
 
+      - name: List artifacts
+        run: find ./artifacts -type f | head -20
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v0.1.${{ github.run_number }}
           name: "The Ghost - Build #${{ github.run_number }}"
-          files: ./artifacts/**/*
+          files: ./artifacts/**/*.zip
           draft: false
           prerelease: true
         env:
