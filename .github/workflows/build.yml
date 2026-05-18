@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Godot
-        uses: abarichello/godot-ci@4.3.0
+        uses: abarichello/godot-ci@4.3-stable
 
       - name: Import Godot Project
         run: godot --headless --import
