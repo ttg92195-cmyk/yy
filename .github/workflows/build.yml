@@ -21,14 +21,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget unzip
-
       - name: Download Godot Editor
         run: |
-          wget -q https://downloads.tuxfamily.org/godotengine/${GODOT_VERSION}/Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_linux.x86_64.zip -O godot.zip
+          wget -q https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-${GODOT_RELEASE}/Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_linux.x86_64.zip -O godot.zip
           unzip godot.zip
           chmod +x Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_linux.x86_64
           mv Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_linux.x86_64 godot_editor
@@ -37,10 +32,10 @@ jobs:
       - name: Download Export Templates
         run: |
           mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_RELEASE}
-          wget -q https://downloads.tuxfamily.org/godotengine/${GODOT_VERSION}/Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_export_templates.tpz -O templates.tpz
+          wget -q https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-${GODOT_RELEASE}/Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_export_templates.tpz -O templates.tpz
           unzip templates.tpz
-          mv templates/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_RELEASE}/
-          ls -la ~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_RELEASE}/
+          cp -r templates/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_RELEASE}/
+          ls ~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_RELEASE}/
 
       - name: Import Godot Project
         run: |
