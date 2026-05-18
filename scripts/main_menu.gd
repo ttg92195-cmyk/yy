@@ -83,13 +83,9 @@ func _on_join_pressed():
 
 func _on_ai_ghost_pressed():
         """Start a local game with AI ghost (single player / LAN practice)"""
-        var player_name = "Solo"
-        if NetworkManager.host_game(player_name):
-                GameManager.enter_lobby()
-                # Immediately start with AI ghost
-                await get_tree().create_timer(0.5).timeout
-                NetworkManager.start_game_ai_ghost()
-                status_label.text = "Starting AI Ghost game..."
+        status_label.text = "Loading game..."
+        # Change to game scene which handles AI ghost automatically
+        get_tree().change_scene_to_file("res://scenes/game.tscn")
 
 
 func _on_connect_pressed():
@@ -178,8 +174,12 @@ func _update_player_list():
 
 
 func _on_settings_pressed():
-        """Open settings (placeholder)"""
-        status_label.text = "Settings coming soon!"
+        """Open settings menu"""
+        $VBoxContainer.visible = false
+        if has_node("SettingsPanel"):
+                $SettingsPanel.visible = true
+        else:
+                status_label.text = "Settings coming soon!"
 
 
 func _on_quit_pressed():
