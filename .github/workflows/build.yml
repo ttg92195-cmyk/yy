@@ -15,35 +15,48 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [android, windows, linux]
+        target: [windows, linux]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Godot
-        uses: abarichello/godot-ci@4.3-stable
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget unzip
+
+      - name: Download Godot Editor
+        run: |
+          wget -q https://downloads.tuxfamily.org/godotengine/${GODOT_VERSION}/Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_linux.x86_64.zip -O godot.zip
+          unzip godot.zip
+          chmod +x Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_linux.x86_64
+          mv Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_linux.x86_64 godot_editor
+          ls -la godot_editor
+
+      - name: Download Export Templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_RELEASE}
+          wget -q https://downloads.tuxfamily.org/godotengine/${GODOT_VERSION}/Godot_v${GODOT_VERSION}-${GODOT_RELEASE}_export_templates.tpz -O templates.tpz
+          unzip templates.tpz
+          mv templates/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_RELEASE}/
+          ls -la ~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_RELEASE}/
 
       - name: Import Godot Project
-        run: godot --headless --import
-
-      - name: Build for Android
-        if: matrix.target == 'android'
         run: |
-          mkdir -p ./build/android
-          godot --headless --export-debug "Android" ./build/android/the-ghost.apk
+          ./godot_editor --headless --import
 
       - name: Build for Windows
         if: matrix.target == 'windows'
         run: |
           mkdir -p ./build/windows
-          godot --headless --export-debug "Windows Desktop" ./build/windows/TheGhost.exe
+          ./godot_editor --headless --export-debug "Windows Desktop" ./build/windows/TheGhost.exe
 
       - name: Build for Linux
         if: matrix.target == 'linux'
         run: |
           mkdir -p ./build/linux
-          godot --headless --export-debug "Linux/X11" ./build/linux/TheGhost.x86_64
+          ./godot_editor --headless --export-debug "Linux/X11" ./build/linux/TheGhost.x86_64
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
