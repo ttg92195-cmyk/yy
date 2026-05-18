@@ -1,6 +1,6 @@
 extends CharacterBody3D
 ## PlayerController - First-person 3D player with movement, sprint, flashlight, and interaction
-## Attached to Player scene root node
+## Includes: Screen shake, flashlight flicker, visual effects
 
 # Movement
 const MOUSE_SENSITIVITY: float = 0.002
@@ -37,53 +37,57 @@ var interact_target: Node3D = null
 @onready var heartbeat_audio: AudioStreamPlayer3D = $HeartbeatAudio
 @onready var interact_label: Label3D = $Head/Camera3D/InteractLabel
 
-# Flashlight starts OFF - player must press button to turn on (horror style!)
+# Flashlight
 var is_flashlight_on: bool = false
+var flashlight_flicker_time: float = 0.0
+var flashlight_is_flickering: bool = false
+
+# Screen shake
+var shake_intensity: float = 0.0
+var shake_decay: float = 5.0
+var shake_offset: Vector3 = Vector3.ZERO
+
+# Player state
 var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var peer_id: int = 1
 var is_local_player: bool = false
+var is_alive: bool = true
 
 
 func _ready():
-	# Set up collision layers
-	collision_layer = 2  # Player layer
-	collision_mask = 1 | 4 | 16  # Environment, Items, Interactable
+	collision_layer = 2
+	collision_mask = 1 | 4 | 16
 
-	# Flashlight setup - START OFF (horror style: press to turn on)
+	# Flashlight setup - starts OFF
 	if flashlight:
 		flashlight.visible = false
-		flashlight.light_energy = 5.0  # Bright flashlight for mobile
+		flashlight.light_energy = 5.0
 		flashlight.spot_range = 30.0
 		flashlight.spot_angle = 50.0
 		flashlight.spot_attenuation = 0.3
-		flashlight.shadow_enabled = false  # Better performance on mobile
+		flashlight.shadow_enabled = false
 
-	# Interaction ray setup
 	if interact_ray:
 		interact_ray.target_position = Vector3(0, 0, -interact_range)
-		interact_ray.collision_mask = 16  # Interactable layer
+		interact_ray.collision_mask = 16
 
-	# Hide interact label initially
 	if interact_label:
 		interact_label.visible = false
 
 
 func setup_as_local(player_peer_id: int):
-	"""Configure this player as the local (controllable) player"""
 	peer_id = player_peer_id
 	is_local_player = true
+	is_alive = true
 	name = "Player_%d" % peer_id
 
-	# Enable camera and input
 	if camera:
 		camera.current = true
 
-	# Only capture mouse on desktop - mobile uses touch controls
 	var is_mobile = OS.has_feature("android") or OS.has_feature("ios")
 	if not is_mobile:
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
-	# Set role-based speed
 	if GameManager.is_ghost_player:
 		current_speed = GameManager.ghost_speed
 		walk_speed = GameManager.ghost_speed
@@ -93,9 +97,8 @@ func setup_as_local(player_peer_id: int):
 		walk_speed = GameManager.human_walk_speed
 		sprint_speed = GameManager.human_sprint_speed
 
-	# Auto-turn on flashlight after a short delay so player can see
+	# Auto-enable flashlight after a short delay
 	if flashlight:
-		# Give player a moment, then auto-enable flashlight
 		get_tree().create_timer(0.5).timeout.connect(func():
 			if is_local_player and flashlight:
 				is_flashlight_on = true
@@ -107,22 +110,19 @@ func setup_as_local(player_peer_id: int):
 
 
 func setup_as_remote(player_peer_id: int):
-	"""Configure this player as a remote (other player's) character"""
 	peer_id = player_peer_id
 	is_local_player = false
 	name = "Player_%d" % peer_id
 
-	# Disable camera for remote players
 	if camera:
 		camera.current = false
 
-	# Disable input processing
 	set_process_input(false)
 	set_process_unhandled_input(false)
 
 
 func _input(event: InputEvent):
-	if not is_local_player:
+	if not is_local_player or not is_alive:
 		return
 
 	if current_state_not_playing():
@@ -144,7 +144,7 @@ func _input(event: InputEvent):
 
 
 func _physics_process(delta):
-	if not is_local_player:
+	if not is_local_player or not is_alive:
 		return
 
 	if current_state_not_playing():
@@ -165,6 +165,7 @@ func _physics_process(delta):
 		# Head bob
 		head_bob_timer += delta * head_bob_frequency * (2.0 if is_sprinting else 1.0)
 		camera.position.y = sin(head_bob_timer) * head_bob_amplitude
+		camera.position.x = cos(head_bob_timer * 0.5) * head_bob_amplitude * 0.3
 	else:
 		velocity.x = lerp(velocity.x, 0.0, deceleration * delta)
 		velocity.z = lerp(velocity.z, 0.0, deceleration * delta)
@@ -181,21 +182,14 @@ func _physics_process(delta):
 	# Interaction check
 	check_interact()
 
-	# Update flashlight battery
-	if flashlight and is_flashlight_on:
-		GameManager.update_flashlight(delta, true)
-		# Scale light energy with battery - but keep minimum brightness high
-		var battery_ratio = GameManager.flashlight_battery / 100.0
-		flashlight.light_energy = lerp(2.0, 5.0, battery_ratio)
-		flashlight.spot_range = lerp(15.0, 30.0, battery_ratio)
-		if GameManager.flashlight_battery <= 0:
-			flashlight.visible = false
-			is_flashlight_on = false
-	else:
-		GameManager.update_flashlight(delta, false)
+	# Update flashlight battery + visual effects
+	_update_flashlight(delta)
 
 	# Heartbeat when ghost is near
 	_update_heartbeat()
+
+	# Screen shake
+	_update_screen_shake(delta)
 
 	move_and_slide()
 
@@ -222,9 +216,8 @@ func handle_sprint(delta: float, direction: Vector3):
 
 
 func toggle_flashlight():
-	"""Toggle flashlight on/off - called by keyboard F or touch button"""
 	if GameManager.flashlight_battery <= 0 and not is_flashlight_on:
-		return  # Can't turn on with dead battery
+		return
 
 	is_flashlight_on = !is_flashlight_on
 
@@ -235,14 +228,92 @@ func toggle_flashlight():
 			flashlight.light_energy = lerp(2.0, 5.0, battery_ratio)
 			flashlight.spot_range = lerp(15.0, 30.0, battery_ratio)
 			flashlight.spot_angle = 50.0
-			_play_flashlight_sound()
+
+			# Turn on flicker effect briefly
+			flashlight_is_flickering = true
+			get_tree().create_timer(0.2).timeout.connect(func(): flashlight_is_flickering = false)
 
 	print("[Player] Flashlight: %s (battery: %.1f%%)" % ["ON" if is_flashlight_on else "OFF", GameManager.flashlight_battery])
 
 
-func _play_flashlight_sound():
-	# Play click sound
-	pass
+func _update_flashlight(delta: float):
+	## Update flashlight with battery drain and visual flicker effects
+	if flashlight and is_flashlight_on:
+		GameManager.update_flashlight(delta, true)
+		var battery_ratio = GameManager.flashlight_battery / 100.0
+
+		# Flashlight flicker when toggling on
+		if flashlight_is_flickering:
+			flashlight_flicker_time += delta * 30.0
+			flashlight.light_energy = 5.0 * (0.5 + 0.5 * sin(flashlight_flicker_time))
+		else:
+			# Normal operation - slight random variation for atmosphere
+			flashlight_flicker_time += delta
+			var flicker = sin(flashlight_flicker_time * 8.0) * 0.05
+			flashlight.light_energy = lerp(2.0, 5.0, battery_ratio) + flicker
+
+		flashlight.spot_range = lerp(15.0, 30.0, battery_ratio)
+
+		# Low battery flicker effect
+		if battery_ratio < 0.15:
+			if randf() < 0.03:
+				flashlight.visible = false
+				get_tree().create_timer(0.1).timeout.connect(func():
+					if is_flashlight_on:
+						flashlight.visible = true
+				)
+			flashlight.light_energy *= randf_range(0.5, 1.0)
+
+		# Battery empty
+		if GameManager.flashlight_battery <= 0:
+			flashlight.visible = false
+			is_flashlight_on = false
+			# Screen shake when flashlight dies
+			add_screen_shake(0.3)
+	else:
+		GameManager.update_flashlight(delta, false)
+
+
+func _update_heartbeat():
+	if GameManager.is_ghost_player:
+		return
+
+	var ghost = get_tree().get_first_node_in_group("ghost")
+	if ghost:
+		var distance = global_position.distance_to(ghost.global_position)
+		if distance < 15.0:
+			var intensity = 1.0 - (distance / 15.0)
+			if heartbeat_audio:
+				heartbeat_audio.volume_db = lerp(-40, -10, intensity)
+				if not heartbeat_audio.playing:
+					heartbeat_audio.play()
+			# Screen shake when ghost is very close
+			if distance < 5.0:
+				add_screen_shake(0.05 * intensity)
+		else:
+			if heartbeat_audio and heartbeat_audio.playing:
+				heartbeat_audio.stop()
+
+
+func add_screen_shake(intensity: float):
+	## Add screen shake effect
+	shake_intensity = max(shake_intensity, intensity)
+
+
+func _update_screen_shake(delta: float):
+	## Apply screen shake to camera
+	if shake_intensity > 0:
+		shake_offset = Vector3(
+			randf_range(-1, 1) * shake_intensity,
+			randf_range(-1, 1) * shake_intensity,
+			0
+		)
+		shake_intensity = max(0, shake_intensity - shake_decay * delta)
+	else:
+		shake_offset = Vector3.ZERO
+
+	if camera:
+		camera.position += shake_offset
 
 
 func check_interact():
@@ -269,33 +340,14 @@ func check_interact():
 func try_interact():
 	if interact_target and interact_target.has_method("on_interact"):
 		interact_target.on_interact(multiplayer.get_unique_id())
-
-
-func _update_heartbeat():
-	"""Play heartbeat sound when ghost is nearby"""
-	if GameManager.is_ghost_player:
-		return
-
-	# Find ghost in scene
-	var ghost = get_tree().get_first_node_in_group("ghost")
-	if ghost:
-		var distance = global_position.distance_to(ghost.global_position)
-		if distance < 15.0:
-			var intensity = 1.0 - (distance / 15.0)
-			if heartbeat_audio:
-				heartbeat_audio.volume_db = lerp(-40, -10, intensity)
-				if not heartbeat_audio.playing:
-					heartbeat_audio.play()
-		else:
-			if heartbeat_audio and heartbeat_audio.playing:
-				heartbeat_audio.stop()
+		# Small screen shake on interact
+		add_screen_shake(0.05)
 
 
 func current_state_not_playing() -> bool:
 	return GameManager.current_state != GameManager.GameState.PLAYING
 
 
-## Sync position to other players via RPC
 @rpc("any_peer", "unreliable_ordered")
 func _sync_position(pos: Vector3, rot: Vector3):
 	if not is_local_player:
@@ -303,31 +355,54 @@ func _sync_position(pos: Vector3, rot: Vector3):
 		rotation = rot
 
 
-## Called when this player is caught by the ghost
 func on_caught_by_ghost():
+	if not is_alive:
+		return
+	is_alive = false
 	GameManager.on_player_caught(peer_id)
 
-	# Visual effects for being caught
 	if is_local_player:
-		# Screen goes red, jump scare
+		add_screen_shake(1.0)  # Big shake when caught
 		_show_caught_screen()
 
 
 func _show_caught_screen():
-	"""Show the caught/death screen"""
 	var overlay = ColorRect.new()
-	overlay.color = Color(0.5, 0, 0, 0.7)
+	overlay.color = Color(0.6, 0, 0, 0.0)
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	get_tree().root.add_child(overlay)
+
+	# Animate the red overlay fading in
+	var tween = get_tree().create_tween()
+	tween.tween_property(overlay, "color:a", 0.8, 0.5)
+
+	await get_tree().create_timer(0.5).timeout
 
 	var label = Label.new()
 	label.text = "YOU HAVE BEEN CAUGHT!"
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", 48)
+	label.add_theme_color_override("font_color", Color(1, 0.2, 0.2))
 	label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	get_tree().root.add_child(label)
 
-	# Disable input
+	# Sub-text
+	var sub_label = Label.new()
+	sub_label.text = "The ghost got you..."
+	sub_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	sub_label.add_theme_font_size_override("font_size", 24)
+	sub_label.add_theme_color_override("font_color", Color(0.8, 0.5, 0.5))
+	sub_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	sub_label.offset_top = 60
+	get_tree().root.add_child(sub_label)
+
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	set_process(false)
+
+
+## Check if player is alive
+func is_alive() -> bool:
+	return is_alive
