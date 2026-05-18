@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [windows, linux]
+        target: [android, windows, linux]
 
     steps:
       - name: Checkout repository
@@ -40,9 +40,42 @@ jobs:
           cp -r templates/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_RELEASE}/
           ls ~/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_RELEASE}/
 
+      - name: Setup Android SDK & Debug Keystore
+        if: matrix.target == 'android'
+        run: |
+          # Install Android SDK
+          sudo apt-get update
+          sudo apt-get install -y android-sdk-platform-tools
+
+          # Install Android SDK components via command line tools
+          export ANDROID_HOME=$HOME/android-sdk
+          mkdir -p $ANDROID_HOME/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdtools.zip
+          unzip cmdtools.zip -d $ANDROID_HOME/cmdline-tools
+          mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
+
+          # Accept licenses and install required components
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+
+          # Generate debug keystore
+          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android -keystore debug.keystore -storepass android -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -destkeystore debug.keystore
+          ls -la debug.keystore
+
       - name: Import Godot Project
         run: |
           ./godot_editor --headless --import
+
+      - name: Build for Android
+        if: matrix.target == 'android'
+        run: |
+          mkdir -p ./build
+          # Update export_presets.cfg with debug keystore path
+          sed -i 's|keystore/debug=""|keystore/debug="../debug.keystore"|g' export_presets.cfg
+          sed -i 's|keystore/debug_user=""|keystore/debug_user="androiddebugkey"|g' export_presets.cfg
+          sed -i 's|keystore/debug_password=""|keystore/debug_password="android"|g' export_presets.cfg
+          ./godot_editor --headless --export-debug "Android" ./build/TheGhost.apk
+          ls -la ./build/
 
       - name: Build for Windows
         if: matrix.target == 'windows'
@@ -57,6 +90,7 @@ jobs:
           ./godot_editor --headless --export-debug "Linux/X11" ./build/TheGhost_Linux.x86_64
 
       - name: Rename files to avoid conflicts
+        if: matrix.target != 'android'
         run: |
           cd ./build
           for f in *.pck *.console.* *.sh; do
