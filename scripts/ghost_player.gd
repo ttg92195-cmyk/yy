@@ -40,27 +40,27 @@ func _ready():
 
 
 func setup_as_local(player_peer_id: int):
-	"""Configure this ghost as the local player's character"""
-	peer_id = player_peer_id
-	is_local_player = true
-	name = "GhostPlayer_%d" % peer_id
-
-	if camera:
-		camera.current = true
-
-	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-
-	# Ghost-specific visual setup
-	if ghost_mesh:
-		# Make ghost semi-transparent for first-person view
-		var mat = ghost_mesh.get_surface_override_material(0)
-		if mat:
-			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			mat.albedo_color.a = 0.3
-
-
-func setup_as_remote(player_peer_id: int):
-	"""Configure as remote player's ghost"""
+	##Configure this ghost as the local player's character##
+## peer_id = player_peer_id
+## is_local_player = true
+## name = "GhostPlayer_%d" % peer_id
+## 
+## if camera:
+## camera.current = true
+## 
+## Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+## 
+## # Ghost-specific visual setup
+## if ghost_mesh:
+## # Make ghost semi-transparent for first-person view
+## var mat = ghost_mesh.get_surface_override_material(0)
+## if mat:
+## mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+## mat.albedo_color.a = 0.3
+## 
+## 
+## func setup_as_remote(player_peer_id: int):
+	Configure as remote player's ghost
 	peer_id = player_peer_id
 	is_local_player = false
 	name = "GhostPlayer_%d" % peer_id
@@ -129,40 +129,40 @@ func _physics_process(delta):
 
 
 func _activate_hunt():
-	"""Activate the ghost's hunt ability"""
-	if hunt_ability_cooldown > 0:
-		return
-
-	is_hunting = true
-	hunt_ability_cooldown = hunt_cooldown_time
-	current_speed = chase_speed
-
-	# Notify all players
-	_notify_hunt.rpc()
-
-	# End hunt after duration
-	get_tree().create_timer(hunt_duration).timeout.connect(func():
-		is_hunting = false
-		current_speed = move_speed
-		_end_hunt.rpc()
-	)
-
-
-@rpc("authority", "call_local")
-func _notify_hunt():
-	"""Notify all clients that the ghost is hunting"""
+	##Activate the ghost's hunt ability##
+## if hunt_ability_cooldown > 0:
+## return
+## 
+## is_hunting = true
+## hunt_ability_cooldown = hunt_cooldown_time
+## current_speed = chase_speed
+## 
+## # Notify all players
+## _notify_hunt.rpc()
+## 
+## # End hunt after duration
+## get_tree().create_timer(hunt_duration).timeout.connect(func():
+## is_hunting = false
+## current_speed = move_speed
+## _end_hunt.rpc()
+## )
+## 
+## 
+## @rpc("authority", "call_local")
+## func _notify_hunt():
+	Notify all clients that the ghost is hunting
 	print("[GhostPlayer] The ghost is HUNTING!")
 	# Play hunt warning sound for all humans
 
 
 @rpc("authority", "call_local")
 func _end_hunt():
-	"""Hunt ended"""
-	print("[GhostPlayer] Ghost hunt ended.")
-
-
-func _on_catch_area_body_entered(body: Node3D):
-	"""Catch a human player"""
+	##Hunt ended##
+## print("[GhostPlayer] Ghost hunt ended.")
+## 
+## 
+## func _on_catch_area_body_entered(body: Node3D):
+	Catch a human player
 	if body.is_in_group("player") and body != self:
 		if body.has_method("on_caught_by_ghost"):
 			body.on_caught_by_ghost()
@@ -170,13 +170,14 @@ func _on_catch_area_body_entered(body: Node3D):
 
 
 func _play_catch_sound():
-	"""Play the catch/kill sound"""
-	if ghost_audio:
-		ghost_audio.play()
-
-
-@rpc("any_peer", "unreliable_ordered")
-func _sync_position(pos: Vector3, rot: Vector3):
-	if not is_local_player:
-		global_position = pos
-		rotation = rot
+	##Play the catch/kill sound##
+## if ghost_audio:
+## ghost_audio.play()
+## 
+## 
+## @rpc("any_peer", "unreliable_ordered")
+## func _sync_position(pos: Vector3, rot: Vector3):
+## if not is_local_player:
+## global_position = pos
+## rotation = rot
+## 

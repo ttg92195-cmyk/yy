@@ -48,7 +48,7 @@ var is_flashlight_on: bool = false
 var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var peer_id: int = 1
 var is_local_player: bool = false
-var is_alive: bool = true
+var alive_state: bool = true
 
 # Heartbeat timer (throttled)
 var heartbeat_check_timer: float = 0.0
@@ -96,7 +96,7 @@ func _ready():
 func setup_as_local(player_peer_id: int):
         peer_id = player_peer_id
         is_local_player = true
-        is_alive = true
+        alive_state = true
         name = "Player_%d" % peer_id
 
         if camera:
@@ -140,7 +140,7 @@ func setup_as_remote(player_peer_id: int):
 
 
 func _input(event: InputEvent):
-        if not is_local_player or not is_alive:
+        if not is_local_player or not alive_state:
                 return
 
         if current_state_not_playing():
@@ -162,7 +162,7 @@ func _input(event: InputEvent):
 
 
 func _physics_process(delta):
-        if not is_local_player or not is_alive:
+        if not is_local_player or not alive_state:
                 return
 
         if current_state_not_playing():
@@ -373,9 +373,9 @@ func _sync_position(pos: Vector3, rot: Vector3):
 
 
 func on_caught_by_ghost():
-        if not is_alive:
+        if not alive_state:
                 return
-        is_alive = false
+        alive_state = false
         GameManager.on_player_caught(peer_id)
 
         if is_local_player:
@@ -418,4 +418,4 @@ func _show_caught_screen():
 
 
 func is_alive() -> bool:
-        return is_alive
+        return alive_state

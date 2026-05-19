@@ -1,13 +1,13 @@
 extends Control
 ## SettingsMenu - Game settings (sensitivity, volume, graphics)
 
-@onready var back_button: Button = $VBoxContainer/BackButton
-@onready var sensitivity_slider: HSlider = $VBoxContainer/SensitivityBox/SensitivitySlider
-@onready var sensitivity_label: Label = $VBoxContainer/SensitivityBox/SensitivityValue
-@onready var volume_slider: HSlider = $VBoxContainer/VolumeBox/VolumeSlider
-@onready var volume_label: Label = $VBoxContainer/VolumeBox/VolumeValue
-@onready var fog_check: CheckBox = $VBoxContainer/FogCheck
-@onready var glow_check: CheckBox = $VBoxContainer/GlowCheck
+var back_button: Button = null
+var sensitivity_slider: HSlider = null
+var sensitivity_label: Label = null
+var volume_slider: HSlider = null
+var volume_label: Label = null
+var fog_check: CheckBox = null
+var glow_check: CheckBox = null
 
 # Settings values
 var mouse_sensitivity: float = 0.002

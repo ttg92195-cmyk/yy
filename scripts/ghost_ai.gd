@@ -390,7 +390,7 @@ func _find_nearest_player() -> Node3D:
 	var nearest: Node3D = null
 	var nd: float = 99999.0
 	for p in players:
-		if p is CharacterBody3D and p.has_method("is_alive") and p.is_alive():
+		if p is CharacterBody3D and p.has_method("is_alive") and p.alive_state:
 			var d = global_position.distance_to(p.global_position)
 			if d < nd:
 				nd = d
