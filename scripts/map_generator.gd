@@ -1,7 +1,7 @@
 extends Node3D
-## MapGenerator - Abandoned Hospital FULL for Mobile
-## V4 - VISIBLE on mobile: bright materials, many lights, full rooms
-## Uses MeshInstance3D + StaticBody3D (NOT CSGBox3D - too heavy for mobile)
+# MapGenerator V6 - Hospital Map for Mobile
+# NO set_script() on dynamic nodes - items handled inline
+# Uses MeshInstance3D + StaticBody3D (not CSGBox3D - too heavy for mobile)
 
 @export var map_width: int = 26
 @export var map_depth: int = 26
@@ -29,67 +29,47 @@ func _ready():
 
 
 func _setup_materials():
-	# Floor - BRIGHT hospital tile
 	floor_mat = StandardMaterial3D.new()
-	var floor_tex = _load_texture("res://assets/textures/plank_floor_diff.jpg")
-	if floor_tex:
-		floor_mat.albedo_texture = floor_tex
-		floor_mat.albedo_color = Color(0.55, 0.50, 0.45)
-	else:
-		floor_mat.albedo_color = Color(0.50, 0.45, 0.40)
+	floor_mat.albedo_color = Color(0.50, 0.45, 0.40)
 	floor_mat.roughness = 0.8
 	floor_mat.uv1_scale = Vector3(4, 1, 4)
 
-	# Corridor floor - lighter tile
 	tile_floor_mat = StandardMaterial3D.new()
 	tile_floor_mat.albedo_color = Color(0.45, 0.42, 0.38)
 	tile_floor_mat.roughness = 0.7
 	tile_floor_mat.uv1_scale = Vector3(3, 1, 3)
 
-	# Wall - MUCH BRIGHTER
 	wall_mat = StandardMaterial3D.new()
-	var wall_tex = _load_texture("res://assets/textures/brick_wall_diff.jpg")
-	if wall_tex:
-		wall_mat.albedo_texture = wall_tex
-		wall_mat.albedo_color = Color(0.65, 0.58, 0.52)
-	else:
-		wall_mat.albedo_color = Color(0.55, 0.48, 0.42)
+	wall_mat.albedo_color = Color(0.55, 0.48, 0.42)
 	wall_mat.roughness = 0.8
 	wall_mat.uv1_scale = Vector3(2, 1.5, 2)
 
-	# Dark wall for scary rooms (still visible)
 	dark_wall_mat = StandardMaterial3D.new()
 	dark_wall_mat.albedo_color = Color(0.40, 0.35, 0.38)
 	dark_wall_mat.roughness = 0.9
 
-	# Ceiling - brighter
 	ceiling_mat = StandardMaterial3D.new()
 	ceiling_mat.albedo_color = Color(0.38, 0.35, 0.38)
 	ceiling_mat.roughness = 0.9
 
-	# Blood stain
 	blood_mat = StandardMaterial3D.new()
 	blood_mat.albedo_color = Color(0.5, 0.05, 0.05, 0.85)
 	blood_mat.transparency_enabled = true
 	blood_mat.roughness = 0.7
 
-	# Door frame
 	door_frame_mat = StandardMaterial3D.new()
 	door_frame_mat.albedo_color = Color(0.40, 0.25, 0.15)
 	door_frame_mat.roughness = 0.8
 
-	# Furniture - wood (brighter)
 	furniture_wood_mat = StandardMaterial3D.new()
 	furniture_wood_mat.albedo_color = Color(0.45, 0.30, 0.18)
 	furniture_wood_mat.roughness = 0.85
 
-	# Furniture - metal
 	furniture_metal_mat = StandardMaterial3D.new()
 	furniture_metal_mat.albedo_color = Color(0.50, 0.50, 0.55)
 	furniture_metal_mat.roughness = 0.4
 	furniture_metal_mat.metallic = 0.6
 
-	# Bed mattress (brighter)
 	bed_mat = StandardMaterial3D.new()
 	bed_mat.albedo_color = Color(0.65, 0.65, 0.60)
 	bed_mat.roughness = 0.9
@@ -101,7 +81,6 @@ func _generate_map():
 
 	# === FLOOR ===
 	_make_solid_box(Vector3(0, -0.05, 0), Vector3(map_width, 0.1, map_depth), floor_mat)
-	# Corridor floor (slightly raised different color)
 	_make_solid_box(Vector3(0, 0.01, 0), Vector3(20, 0.01, 4), tile_floor_mat)
 	_make_solid_box(Vector3(0, 0.01, 7), Vector3(4, 0.01, 10), tile_floor_mat)
 
@@ -115,7 +94,6 @@ func _generate_map():
 	_make_solid_box(Vector3(hw, wall_height/2, 0), Vector3(wall_thickness, wall_height, map_depth), wall_mat)
 
 	# === MAIN CORRIDOR (Z: -2 to 2, X: -10 to 10) ===
-	# North corridor wall with 3 door gaps
 	_make_wall_segment_x(Vector3(-10, wall_height/2, -2), 3.0)
 	_make_door_gap_x(Vector3(-8, wall_height/2, -2))
 	_make_wall_segment_x(Vector3(-5.5, wall_height/2, -2), 2.0)
@@ -124,7 +102,6 @@ func _generate_map():
 	_make_door_gap_x(Vector3(8, wall_height/2, -2))
 	_make_wall_segment_x(Vector3(10.5, wall_height/2, -2), 3.0)
 
-	# South corridor wall with 3 door gaps
 	_make_wall_segment_x(Vector3(-10, wall_height/2, 2), 3.0)
 	_make_door_gap_x(Vector3(-8, wall_height/2, 2))
 	_make_wall_segment_x(Vector3(-5.5, wall_height/2, 2), 2.0)
@@ -136,7 +113,6 @@ func _generate_map():
 	# === ROOM DIVIDERS (NORTH SIDE) ===
 	_make_solid_box(Vector3(-4, wall_height/2, -5), Vector3(wall_thickness, wall_height, 6), wall_mat)
 	_make_solid_box(Vector3(4, wall_height/2, -5), Vector3(wall_thickness, wall_height, 6), wall_mat)
-	# North room back walls
 	_make_solid_box(Vector3(-8, wall_height/2, -8), Vector3(8, wall_height, wall_thickness), wall_mat)
 	_make_solid_box(Vector3(0, wall_height/2, -8), Vector3(8, wall_height, wall_thickness), wall_mat)
 	_make_solid_box(Vector3(8, wall_height/2, -8), Vector3(8, wall_height, wall_thickness), wall_mat)
@@ -144,21 +120,19 @@ func _generate_map():
 	# === ROOM DIVIDERS (SOUTH SIDE) ===
 	_make_solid_box(Vector3(-4, wall_height/2, 5), Vector3(wall_thickness, wall_height, 6), wall_mat)
 	_make_solid_box(Vector3(4, wall_height/2, 5), Vector3(wall_thickness, wall_height, 6), wall_mat)
-	# South room back walls
 	_make_solid_box(Vector3(-8, wall_height/2, 8), Vector3(8, wall_height, wall_thickness), wall_mat)
 	_make_solid_box(Vector3(0, wall_height/2, 8), Vector3(8, wall_height, wall_thickness), wall_mat)
 	_make_solid_box(Vector3(8, wall_height/2, 8), Vector3(8, wall_height, wall_thickness), wall_mat)
 
-	# === SIDE CORRIDOR (X: -2 to 2, Z: 2 to 12) ===
+	# === SIDE CORRIDOR ===
 	_make_solid_box(Vector3(-2, wall_height/2, 7), Vector3(wall_thickness, wall_height, 10), wall_mat)
-	# East wall of side corridor with door gaps
 	_make_wall_segment_z(Vector3(2, wall_height/2, 3.5), 2.0)
 	_make_door_gap_z(Vector3(2, wall_height/2, 5))
 	_make_wall_segment_z(Vector3(2, wall_height/2, 7), 2.0)
 	_make_door_gap_z(Vector3(2, wall_height/2, 9))
 	_make_wall_segment_z(Vector3(2, wall_height/2, 10.5), 2.0)
 
-	# === MORGUE & END AREA (Z: 10 to 13) ===
+	# === MORGUE ===
 	_make_solid_box(Vector3(0, wall_height/2, 12.5), Vector3(4, wall_height, wall_thickness), dark_wall_mat)
 	_make_solid_box(Vector3(-2, wall_height/2, 11), Vector3(wall_thickness, wall_height, 3), dark_wall_mat)
 	_make_solid_box(Vector3(2, wall_height/2, 11), Vector3(wall_thickness, wall_height, 3), dark_wall_mat)
@@ -175,13 +149,10 @@ func _generate_map():
 	# === BLOOD STAINS ===
 	_add_blood_stains()
 
-	# === LIGHTS - SUPER BRIGHT for mobile! ===
-	# Main corridor - VERY bright warm lights
+	# === LIGHTS ===
 	_make_light(Vector3(0, 2.7, 0), Color(1.0, 0.9, 0.7), 8.0, 35.0)
 	_make_light(Vector3(-7, 2.7, 0), Color(0.9, 0.8, 0.6), 6.0, 30.0)
 	_make_light(Vector3(7, 2.7, 0), Color(0.9, 0.8, 0.6), 6.0, 30.0)
-
-	# Room lights - bright
 	_make_light(Vector3(-10, 2.7, -5), Color(0.8, 0.7, 0.5), 5.0, 25.0)
 	_make_light(Vector3(0, 2.7, -5), Color(0.8, 0.75, 0.5), 5.0, 25.0)
 	_make_light(Vector3(10, 2.7, -5), Color(0.8, 0.75, 0.5), 4.0, 22.0)
@@ -189,26 +160,18 @@ func _generate_map():
 	_make_light(Vector3(0, 2.7, 7), Color(0.8, 0.7, 0.5), 5.0, 25.0)
 	_make_light(Vector3(10, 2.7, 5), Color(0.8, 0.7, 0.5), 4.0, 22.0)
 	_make_light(Vector3(0, 2.7, 11.5), Color(0.7, 0.3, 0.3), 3.0, 18.0)
-
-	# EXTRA corridor lights
 	_make_light(Vector3(-3, 2.7, 0), Color(0.9, 0.8, 0.6), 5.0, 25.0)
 	_make_light(Vector3(3, 2.7, 0), Color(0.9, 0.8, 0.6), 5.0, 25.0)
 	_make_light(Vector3(0, 2.7, 4), Color(0.8, 0.7, 0.5), 4.0, 22.0)
 
-	# More room fill lights
-	_make_light(Vector3(-6, 2.7, -6), Color(0.7, 0.6, 0.4), 3.0, 18.0)
-	_make_light(Vector3(6, 2.7, -6), Color(0.7, 0.6, 0.4), 3.0, 18.0)
-	_make_light(Vector3(-6, 2.7, 6), Color(0.7, 0.6, 0.4), 3.0, 18.0)
-	_make_light(Vector3(6, 2.7, 6), Color(0.7, 0.6, 0.4), 3.0, 18.0)
-
-	# === PLAYER START MARKER (bright green pillar) ===
-	var start_marker_mat = StandardMaterial3D.new()
-	start_marker_mat.albedo_color = Color(0, 1, 0)
-	start_marker_mat.emission_enabled = true
-	start_marker_mat.emission = Color(0, 1, 0)
-	start_marker_mat.emission_energy = 3.0
-	start_marker_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_make_decoration(Vector3(0, 0.5, 0), Vector3(0.3, 1.0, 0.3), start_marker_mat)
+	# === PLAYER START MARKER ===
+	var start_mat = StandardMaterial3D.new()
+	start_mat.albedo_color = Color(0, 1, 0)
+	start_mat.emission_enabled = true
+	start_mat.emission = Color(0, 1, 0)
+	start_mat.emission_energy = 3.0
+	start_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_make_decoration(Vector3(0, 0.5, 0), Vector3(0.3, 1.0, 0.3), start_mat)
 
 	# === PATROL POINTS ===
 	var patrol_positions = [
@@ -228,7 +191,7 @@ func _generate_map():
 		add_child(m)
 		_node_count += 1
 
-	# === KEY ITEMS ===
+	# === KEY ITEMS (NO set_script - handled by Area3D body_entered) ===
 	_place_items()
 
 	# === ESCAPE DOOR ===
@@ -315,7 +278,6 @@ func _add_room_labels():
 		add_child(label)
 		_node_count += 1
 
-	# Direction signs
 	var dir_label = Label3D.new()
 	dir_label.text = "MORGUE ->"
 	dir_label.position = Vector3(-1.8, 2.2, 4)
@@ -334,48 +296,40 @@ func _add_room_labels():
 
 
 func _add_furniture():
-	# Room 1: Surgery
+	# Surgery
 	_make_decoration(Vector3(-9, 0.4, -5), Vector3(2.5, 0.8, 1.2), furniture_metal_mat)
 	_make_decoration(Vector3(-9, 0.85, -5), Vector3(2.3, 0.1, 1.0), bed_mat)
 	_make_decoration(Vector3(-11, 0.5, -7), Vector3(0.8, 1.0, 0.5), furniture_metal_mat)
-	_make_decoration(Vector3(-7, 0.8, -3.5), Vector3(0.05, 1.6, 0.05), furniture_metal_mat)
-	_make_decoration(Vector3(-7, 1.6, -3.5), Vector3(0.3, 0.05, 0.3), furniture_metal_mat)
 
-	# Room 2: Patient Room
+	# Patient Room
 	_make_decoration(Vector3(-2, 0.3, -5), Vector3(1.8, 0.6, 0.9), furniture_wood_mat)
 	_make_decoration(Vector3(-2, 0.6, -5), Vector3(1.6, 0.1, 0.7), bed_mat)
 	_make_decoration(Vector3(2, 0.3, -5), Vector3(1.8, 0.6, 0.9), furniture_wood_mat)
 	_make_decoration(Vector3(2, 0.6, -5), Vector3(1.6, 0.1, 0.7), bed_mat)
-	_make_decoration(Vector3(-0.5, 0.3, -3.5), Vector3(0.5, 0.6, 0.4), furniture_wood_mat)
 
-	# Room 3: Lab
+	# Lab
 	_make_decoration(Vector3(7, 0.4, -5), Vector3(3.0, 0.8, 0.8), furniture_wood_mat)
 	_make_decoration(Vector3(10, 0.4, -6), Vector3(0.6, 0.8, 0.6), furniture_metal_mat)
-	_make_decoration(Vector3(9, 1.5, -7.8), Vector3(2.0, 0.1, 0.4), furniture_wood_mat)
 
-	# Room 4: Pharmacy
+	# Pharmacy
 	_make_decoration(Vector3(-8, 0.5, 5), Vector3(2.5, 1.0, 0.6), furniture_wood_mat)
 	_make_decoration(Vector3(-11, 1.2, 6), Vector3(0.4, 1.8, 0.3), furniture_wood_mat)
-	_make_decoration(Vector3(-10, 1.2, 7), Vector3(0.4, 1.8, 0.3), furniture_wood_mat)
 
-	# Room 5: Storage
+	# Storage
 	_make_decoration(Vector3(-2, 0.4, 5), Vector3(1.5, 0.8, 1.0), furniture_wood_mat)
-	_make_decoration(Vector3(1, 0.3, 4), Vector3(0.8, 0.6, 0.8), furniture_wood_mat)
 	_make_decoration(Vector3(2, 0.4, 6), Vector3(1.2, 0.8, 0.6), furniture_wood_mat)
 
-	# Room 6: Ward B
+	# Ward B
 	_make_decoration(Vector3(6, 0.3, 4), Vector3(1.8, 0.6, 0.9), furniture_wood_mat)
 	_make_decoration(Vector3(6, 0.6, 4), Vector3(1.6, 0.1, 0.7), bed_mat)
 	_make_decoration(Vector3(9, 0.3, 4), Vector3(1.8, 0.6, 0.9), furniture_wood_mat)
 	_make_decoration(Vector3(9, 0.6, 4), Vector3(1.6, 0.1, 0.7), bed_mat)
-	_make_decoration(Vector3(11, 0.3, 7), Vector3(0.7, 0.6, 0.7), furniture_metal_mat)
 
-	# Office area
+	# Office
 	_make_decoration(Vector3(5, 0.35, 6), Vector3(1.5, 0.05, 0.8), furniture_wood_mat)
-	_make_decoration(Vector3(5, 0.35, 6), Vector3(1.5, 0.7, 0.05), furniture_wood_mat)
 	_make_decoration(Vector3(5, 0.25, 7), Vector3(0.5, 0.5, 0.5), furniture_wood_mat)
 
-	# Morgue area
+	# Morgue
 	_make_decoration(Vector3(-1, 0.3, 11.5), Vector3(2.0, 0.5, 0.8), furniture_metal_mat)
 	_make_decoration(Vector3(1, 0.5, 11.5), Vector3(0.8, 1.0, 1.5), furniture_metal_mat)
 	var body_bag_mat = StandardMaterial3D.new()
@@ -386,14 +340,11 @@ func _add_furniture():
 
 func _add_blood_stains():
 	_make_decoration(Vector3(-9, 0.06, -5.5), Vector3(1.5, 0.01, 1.0), blood_mat)
-	_make_decoration(Vector3(-10, 0.06, -4), Vector3(0.6, 0.01, 0.4), blood_mat)
 	_make_decoration(Vector3(-1, 0.06, 11.5), Vector3(1.2, 0.01, 0.8), blood_mat)
-	_make_decoration(Vector3(0.5, 0.06, 12), Vector3(0.5, 0.01, 0.5), blood_mat)
 	_make_decoration(Vector3(3, 0.06, 0.5), Vector3(0.3, 0.01, 2.0), blood_mat)
-	_make_decoration(Vector3(1, 0.06, 1.5), Vector3(0.2, 0.01, 1.0), blood_mat)
+	_make_decoration(Vector3(9, 0.06, 4.5), Vector3(0.8, 0.01, 0.5), blood_mat)
 	_make_decoration(Vector3(-9.8, 1.2, -5), Vector3(0.01, 0.3, 0.2), blood_mat)
 	_make_decoration(Vector3(-1.8, 1.5, 11), Vector3(0.01, 0.4, 0.25), blood_mat)
-	_make_decoration(Vector3(9, 0.06, 4.5), Vector3(0.8, 0.01, 0.5), blood_mat)
 
 
 func _make_decoration(position: Vector3, size: Vector3, mat):
@@ -403,11 +354,6 @@ func _make_decoration(position: Vector3, size: Vector3, mat):
 	mesh_inst.mesh = box
 	if mat is StandardMaterial3D:
 		mesh_inst.set_surface_override_material(mat)
-	elif mat is Color:
-		var m = StandardMaterial3D.new()
-		m.albedo_color = mat
-		m.roughness = 0.9
-		mesh_inst.set_surface_override_material(m)
 	mesh_inst.position = position
 	add_child(mesh_inst)
 	_node_count += 1
@@ -425,72 +371,80 @@ func _make_light(position: Vector3, color: Color, energy: float, range_val: floa
 
 
 func _place_items():
+	# Items as simple Area3D with body_entered - NO set_script()
 	var item_data = [
-		{"type": 0, "pos": Vector3(-11, 0.5, -7), "name": "KEY_RED"},
-		{"type": 1, "pos": Vector3(10, 0.5, -6), "name": "KEY_BLUE"},
-		{"type": 2, "pos": Vector3(-11, 0.5, 6), "name": "KEY_GREEN"},
-		{"type": 3, "pos": Vector3(-1, 0.5, 11), "name": "CAR_KEY"},
+		{"type": 0, "pos": Vector3(-11, 0.5, -7), "name": "KEY_RED", "color": Color(1, 0.2, 0.2)},
+		{"type": 1, "pos": Vector3(10, 0.5, -6), "name": "KEY_BLUE", "color": Color(0.2, 0.4, 1)},
+		{"type": 2, "pos": Vector3(-11, 0.5, 6), "name": "KEY_GREEN", "color": Color(0.2, 1, 0.3)},
+		{"type": 3, "pos": Vector3(-1, 0.5, 11), "name": "CAR_KEY", "color": Color(1, 0.8, 0.2)},
 	]
+	var key_name_map = {0: "key_red", 1: "key_blue", 2: "key_green", 3: "car_key"}
+
 	for item in item_data:
-		var node = _create_item_node(item.type, item.name)
-		node.position = item.pos
-		add_child(node)
+		var area = Area3D.new()
+		area.collision_layer = 16
+		area.collision_mask = 2
+		area.add_to_group("items")
+		area.add_to_group("interactable")
+		area.position = item.pos
+
+		# Collision
+		var col = CollisionShape3D.new()
+		var sphere = SphereShape3D.new()
+		sphere.radius = 1.5
+		col.shape = sphere
+		area.add_child(col)
+
+		# Visual - glowing key
+		var mesh_inst = MeshInstance3D.new()
+		var box = BoxMesh.new()
+		box.size = Vector3(0.15, 0.5, 0.08)
+		mesh_inst.mesh = box
+		mesh_inst.position = Vector3(0, 0.8, 0)
+		var mat = StandardMaterial3D.new()
+		mat.emission_enabled = true
+		mat.emission_energy = 5.0
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_color = item.color
+		mat.emission = item.color
+		mesh_inst.set_surface_override_material(mat)
+		area.add_child(mesh_inst)
+
+		# Key light
+		var key_light = OmniLight3D.new()
+		key_light.position = Vector3(0, 0.8, 0)
+		key_light.light_energy = 3.0
+		key_light.omni_range = 8.0
+		key_light.light_color = item.color
+		key_light.shadow_enabled = false
+		area.add_child(key_light)
+
+		# Connect body_entered to collect item
+		var item_type = item.type
+		var item_key = key_name_map[item_type]
+		area.body_entered.connect(func(body):
+			if body.is_in_group("player"):
+				var peer_id = 1
+				if "peer_id" in body:
+					peer_id = body.peer_id
+				if GameManager and not GameManager.required_items.get(item_key, false):
+					GameManager.on_item_collected(item_key, peer_id)
+				# Hide item
+				mesh_inst.visible = false
+				col.set_deferred("disabled", true)
+				key_light.visible = false
+		)
+
+		add_child(area)
 		_node_count += 1
-
-
-func _create_item_node(type: int, display_name: String) -> Area3D:
-	var area = Area3D.new()
-	area.collision_layer = 16
-	area.collision_mask = 2
-	area.add_to_group("items")
-	area.add_to_group("interactable")
-	area.set_script(load("res://scripts/item_collector.gd"))
-	area.set("item_type", type)
-	area.set("item_display_name", display_name)
-
-	var col = CollisionShape3D.new()
-	var sphere = SphereShape3D.new()
-	sphere.radius = 1.5
-	col.shape = sphere
-	area.add_child(col)
-
-	var mesh_inst = MeshInstance3D.new()
-	var box = BoxMesh.new()
-	box.size = Vector3(0.15, 0.5, 0.08)
-	mesh_inst.mesh = box
-	mesh_inst.position = Vector3(0, 0.8, 0)
-	var mat = StandardMaterial3D.new()
-	mat.emission_enabled = true
-	mat.emission_energy = 5.0
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	match type:
-		0: mat.albedo_color = Color(1,0.2,0.2); mat.emission = Color(1,0.2,0.2)
-		1: mat.albedo_color = Color(0.2,0.4,1); mat.emission = Color(0.2,0.4,1)
-		2: mat.albedo_color = Color(0.2,1,0.3); mat.emission = Color(0.2,1,0.3)
-		3: mat.albedo_color = Color(1,0.8,0.2); mat.emission = Color(1,0.8,0.2)
-	mesh_inst.set_surface_override_material(mat)
-	area.add_child(mesh_inst)
-
-	var key_light = OmniLight3D.new()
-	key_light.position = Vector3(0, 0.8, 0)
-	key_light.light_energy = 3.0
-	key_light.omni_range = 8.0
-	key_light.shadow_enabled = false
-	match type:
-		0: key_light.light_color = Color(1, 0.3, 0.3)
-		1: key_light.light_color = Color(0.3, 0.5, 1)
-		2: key_light.light_color = Color(0.3, 1, 0.4)
-		3: key_light.light_color = Color(1, 0.9, 0.3)
-	area.add_child(key_light)
-
-	return area
 
 
 func _place_escape_door():
 	var door = StaticBody3D.new()
 	door.collision_layer = 1
-	door.set_script(load("res://scripts/escape_door.gd"))
 	door.position = Vector3(12.5, 1.5, 0)
+	door.add_to_group("interactable")
+	door.add_to_group("escape_door")
 
 	var col = CollisionShape3D.new()
 	var shape = BoxShape3D.new()
@@ -519,7 +473,6 @@ func _place_escape_door():
 	label.billboard = 1
 	door.add_child(label)
 
-	# EXIT light above door
 	var exit_light = OmniLight3D.new()
 	exit_light.position = Vector3(0, 2.5, 0)
 	exit_light.light_color = Color(0, 1, 0)
@@ -528,11 +481,34 @@ func _place_escape_door():
 	exit_light.shadow_enabled = false
 	door.add_child(exit_light)
 
+	# Handle interaction via Area3D
+	var door_area = Area3D.new()
+	door_area.collision_mask = 2
+	var door_col = CollisionShape3D.new()
+	var door_sphere = SphereShape3D.new()
+	door_sphere.radius = 2.0
+	door_col.shape = door_sphere
+	door_area.add_child(door_col)
+
+	door_area.body_entered.connect(func(body):
+		if body.is_in_group("player"):
+			if GameManager:
+				if GameManager.escape_door_unlocked:
+					var peer_id = 1
+					if "peer_id" in body:
+						peer_id = body.peer_id
+					GameManager.on_player_escaped(peer_id)
+	)
+
+	door.add_child(door_area)
+
+	# Listen for all items collected
+	if GameManager:
+		GameManager.all_items_collected.connect(func():
+			dmat.emission = Color(0, 0.5, 0)
+			dmat.emission_energy = 2.0
+			label.modulate = Color(0, 1, 0)
+		)
+
 	add_child(door)
 	_node_count += 1
-
-
-func _load_texture(path: String) -> Texture2D:
-	if ResourceLoader.exists(path):
-		return load(path) as Texture2D
-	return null
