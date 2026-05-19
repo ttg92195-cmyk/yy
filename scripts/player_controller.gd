@@ -47,7 +47,7 @@ var is_flashlight_on: bool = false
 
 # Player state - CRITICAL: variable is alive_state NOT is_alive
 # (is_alive is also a function name, GDScript 4 does not allow same name)
-var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
+var gravity: float = 9.8
 var peer_id: int = 1
 var is_local_player: bool = false
 var alive_state: bool = true

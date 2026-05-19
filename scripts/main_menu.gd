@@ -210,7 +210,7 @@ func _create_ui():
 
         # Version label
         version_label = Label.new()
-        version_label.text = "v0.4.0 - FULL MAP + BRIGHT"
+        version_label.text = "v0.5.0 - BLACK SCREEN FIX"
         version_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         version_label.add_theme_color_override("font_color", Color(1, 0.5, 0))
         version_label.add_theme_font_size_override("font_size", 18)
@@ -379,7 +379,9 @@ func _on_join_pressed():
 
 func _on_ai_ghost_pressed():
         status_label.text = "Loading horror game..."
-        get_tree().change_scene_to_file("res://scenes/game.tscn")
+        status_label.add_theme_color_override("font_color", Color(1, 0.8, 0))
+        # Use call_deferred to avoid issues with scene change during input
+        get_tree().change_scene_to_file.call_deferred("res://scenes/game.tscn")
 
 
 func _on_connect_pressed():

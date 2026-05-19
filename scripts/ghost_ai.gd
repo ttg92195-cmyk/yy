@@ -32,7 +32,7 @@ var head_mesh: MeshInstance3D
 var body_mesh: MeshInstance3D
 var eye_light: OmniLight3D
 
-var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
+var gravity: float = 9.8
 var move_target: Vector3 = Vector3.ZERO
 
 
