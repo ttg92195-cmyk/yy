@@ -10,10 +10,12 @@ var battery_label: Label
 var ghost_warning: Label
 var status_label: Label
 var crosshair: CenterContainer
+var stamina_bar: ProgressBar
 
 var is_ghost_near: bool = false
 var update_timer: float = 0.0
 var warning_anim_time: float = 0.0
+
 
 func _ready():
 	layer = 5
@@ -21,15 +23,15 @@ func _ready():
 
 
 func _create_hud():
-	# ---- TOP LEFT: Keys ----
+	# ---- TOP LEFT: Keys Panel ----
 	var top_panel = Panel.new()
 	top_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	top_panel.offset_left = 8
-	top_panel.offset_right = 260
+	top_panel.offset_right = 270
 	top_panel.offset_top = 8
-	top_panel.offset_bottom = 52
+	top_panel.offset_bottom = 55
 	var top_style = StyleBoxFlat.new()
-	top_style.bg_color = Color(0.03, 0.01, 0.01, 0.75)
+	top_style.bg_color = Color(0.03, 0.01, 0.01, 0.80)
 	top_style.border_color = Color(0.4, 0.1, 0.1, 0.6)
 	top_style.border_width_bottom = 1
 	top_style.border_width_top = 1
@@ -45,7 +47,7 @@ func _create_hud():
 	var keys_label = Label.new()
 	keys_label.text = "KEYS:"
 	keys_label.position = Vector2(8, 4)
-	keys_label.add_theme_font_size_override("font_size", 13)
+	keys_label.add_theme_font_size_override("font_size", 12)
 	keys_label.add_theme_color_override("font_color", Color(0.7, 0.4, 0.4))
 	top_panel.add_child(keys_label)
 
@@ -59,15 +61,15 @@ func _create_hud():
 	_create_key_indicator("key_green", Color(0.2, 1, 0.3), "G")
 	_create_key_indicator("car_key", Color(1, 0.85, 0.2), "C")
 
-	# ---- TOP RIGHT: Battery ----
+	# ---- TOP RIGHT: Battery Panel ----
 	var battery_panel = Panel.new()
 	battery_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	battery_panel.offset_left = -170
+	battery_panel.offset_left = -180
 	battery_panel.offset_right = -8
 	battery_panel.offset_top = 8
-	battery_panel.offset_bottom = 52
+	battery_panel.offset_bottom = 70
 	var batt_style = StyleBoxFlat.new()
-	batt_style.bg_color = Color(0.03, 0.01, 0.01, 0.75)
+	batt_style.bg_color = Color(0.03, 0.01, 0.01, 0.80)
 	batt_style.border_color = Color(0.4, 0.1, 0.1, 0.6)
 	batt_style.border_width_bottom = 1
 	batt_style.border_width_top = 1
@@ -80,16 +82,16 @@ func _create_hud():
 	battery_panel.add_theme_stylebox_override("panel", batt_style)
 	add_child(battery_panel)
 
-	var flash_label = Label.new()
-	flash_label.text = "BATTERY"
-	flash_label.position = Vector2(8, 2)
-	flash_label.add_theme_font_size_override("font_size", 10)
-	flash_label.add_theme_color_override("font_color", Color(0.7, 0.6, 0.4))
-	battery_panel.add_child(flash_label)
+	var flash_icon = Label.new()
+	flash_icon.text = "[LIGHT]"
+	flash_icon.position = Vector2(8, 2)
+	flash_icon.add_theme_font_size_override("font_size", 10)
+	flash_icon.add_theme_color_override("font_color", Color(0.7, 0.6, 0.4))
+	battery_panel.add_child(flash_icon)
 
 	battery_bar = ProgressBar.new()
 	battery_bar.position = Vector2(8, 18)
-	battery_bar.size = Vector2(140, 14)
+	battery_bar.size = Vector2(140, 12)
 	battery_bar.min_value = 0
 	battery_bar.max_value = 100
 	battery_bar.value = 100
@@ -111,25 +113,56 @@ func _create_hud():
 	battery_panel.add_child(battery_bar)
 
 	battery_label = Label.new()
-	battery_label.position = Vector2(58, 19)
+	battery_label.position = Vector2(55, 18)
 	battery_label.text = "100%"
-	battery_label.add_theme_font_size_override("font_size", 10)
+	battery_label.add_theme_font_size_override("font_size", 9)
 	battery_label.add_theme_color_override("font_color", Color(0.9, 0.8, 0.5))
 	battery_panel.add_child(battery_label)
+
+	# Stamina bar below battery
+	var stamina_label = Label.new()
+	stamina_label.text = "[STAMINA]"
+	stamina_label.position = Vector2(8, 34)
+	stamina_label.add_theme_font_size_override("font_size", 10)
+	stamina_label.add_theme_color_override("font_color", Color(0.5, 0.6, 0.4))
+	battery_panel.add_child(stamina_label)
+
+	stamina_bar = ProgressBar.new()
+	stamina_bar.position = Vector2(8, 48)
+	stamina_bar.size = Vector2(140, 8)
+	stamina_bar.min_value = 0
+	stamina_bar.max_value = 100
+	stamina_bar.value = 100
+	stamina_bar.show_percentage = false
+	var stam_bg = StyleBoxFlat.new()
+	stam_bg.bg_color = Color(0.05, 0.05, 0.02, 0.8)
+	stam_bg.corner_radius_top_left = 2
+	stam_bg.corner_radius_top_right = 2
+	stam_bg.corner_radius_bottom_left = 2
+	stam_bg.corner_radius_bottom_right = 2
+	stamina_bar.add_theme_stylebox_override("background", stam_bg)
+	var stam_fill = StyleBoxFlat.new()
+	stam_fill.bg_color = Color(0.3, 0.7, 0.3)
+	stam_fill.corner_radius_top_left = 2
+	stam_fill.corner_radius_top_right = 2
+	stam_fill.corner_radius_bottom_left = 2
+	stam_fill.corner_radius_bottom_right = 2
+	stamina_bar.add_theme_stylebox_override("fill", stam_fill)
+	battery_panel.add_child(stamina_bar)
 
 	# ---- CENTER: Crosshair ----
 	crosshair = CenterContainer.new()
 	crosshair.set_anchors_preset(Control.PRESET_CENTER)
-	crosshair.offset_left = -8
-	crosshair.offset_right = 8
-	crosshair.offset_top = -8
-	crosshair.offset_bottom = 8
+	crosshair.offset_left = -6
+	crosshair.offset_right = 6
+	crosshair.offset_top = -6
+	crosshair.offset_bottom = 6
 	add_child(crosshair)
 
 	var dot = ColorRect.new()
-	dot.size = Vector2(4, 4)
-	dot.position = Vector2(-2, -2)
-	dot.color = Color(0.8, 0.2, 0.2, 0.6)
+	dot.size = Vector2(3, 3)
+	dot.position = Vector2(-1.5, -1.5)
+	dot.color = Color(0.7, 0.15, 0.15, 0.5)
 	crosshair.add_child(dot)
 
 	# ---- BOTTOM CENTER: Ghost warning ----
@@ -141,7 +174,7 @@ func _create_hud():
 	ghost_warning.offset_bottom = -8
 	ghost_warning.text = "!! GHOST IS NEAR !!"
 	ghost_warning.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ghost_warning.add_theme_font_size_override("font_size", 18)
+	ghost_warning.add_theme_font_size_override("font_size", 16)
 	ghost_warning.add_theme_color_override("font_color", Color(1, 0.15, 0.15))
 	ghost_warning.visible = false
 	add_child(ghost_warning)
@@ -153,7 +186,7 @@ func _create_hud():
 	status_label.offset_top = -28
 	status_label.offset_bottom = -5
 	status_label.text = ""
-	status_label.add_theme_font_size_override("font_size", 12)
+	status_label.add_theme_font_size_override("font_size", 11)
 	status_label.add_theme_color_override("font_color", Color(0.6, 0.4, 0.4))
 	add_child(status_label)
 
@@ -188,7 +221,7 @@ func _create_key_indicator(key_name: String, color: Color, letter: String):
 
 
 func _process(delta):
-	# Throttle updates
+	# Throttle updates for mobile performance
 	update_timer += delta
 	if update_timer < 0.25:
 		# Only animate warning
@@ -206,9 +239,22 @@ func _process(delta):
 			battery_label.text = "%.0f%%" % GameManager.flashlight_battery
 		var fill = battery_bar.get_theme_stylebox("fill") as StyleBoxFlat
 		if fill:
-			if GameManager.flashlight_battery > 50: fill.bg_color = Color(0.8, 0.6, 0.15)
-			elif GameManager.flashlight_battery > 20: fill.bg_color = Color(0.8, 0.4, 0.1)
-			else: fill.bg_color = Color(0.8, 0.15, 0.1)
+			if GameManager.flashlight_battery > 50:
+				fill.bg_color = Color(0.8, 0.6, 0.15)
+			elif GameManager.flashlight_battery > 20:
+				fill.bg_color = Color(0.8, 0.4, 0.1)
+			else:
+				fill.bg_color = Color(0.8, 0.15, 0.1)
+
+	# Stamina
+	if stamina_bar:
+		# Find local player's stamina
+		var players = get_tree().get_nodes_in_group("player")
+		for p in players:
+			if p.has_method("is_local_player") and p.is_local_player:
+				if "stamina" in p:
+					stamina_bar.value = p.stamina
+				break
 
 	# Keys
 	for key_name in GameManager.required_items:
@@ -218,7 +264,7 @@ func _process(delta):
 				ki.collected = true
 				var style = ki.panel.get_theme_stylebox("panel") as StyleBoxFlat
 				if style:
-					style.bg_color = Color(ki.color.r*0.3, ki.color.g*0.3, ki.color.b*0.3, 0.9)
+					style.bg_color = Color(ki.color.r * 0.3, ki.color.g * 0.3, ki.color.b * 0.3, 0.9)
 					style.border_color = ki.color
 				ki.label.add_theme_color_override("font_color", ki.color)
 
@@ -228,13 +274,14 @@ func _process(delta):
 		var players = get_tree().get_nodes_in_group("player")
 		var found = false
 		for p in players:
-			if p.is_local_player:
+			if "is_local_player" in p and p.is_local_player:
 				if p.global_position.distance_to(ghost.global_position) < 15.0:
 					found = true
 				break
 		is_ghost_near = found
 		ghost_warning.visible = found
-		if not found: warning_anim_time = 0.0
+		if not found:
+			warning_anim_time = 0.0
 	else:
 		ghost_warning.visible = false
 		is_ghost_near = false
