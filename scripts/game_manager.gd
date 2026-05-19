@@ -1,6 +1,10 @@
 extends Node
 ## GameManager - Global game state management (AutoLoad singleton)
-## Manages: Game states, player roles, win/lose conditions, item collection
+## V7 - FIXED for single-player AI Ghost mode
+## Key fixes:
+## - start_gameplay_singleplayer() properly sets alive_humans=1
+## - on_player_caught/on_item_collected work WITHOUT multiplayer
+## - return_to_menu() safe when no multiplayer peer
 
 enum GameState {
 	MENU,
@@ -20,10 +24,10 @@ signal ghost_victory()
 signal human_victory()
 
 var current_state: GameState = GameState.MENU
-var local_role: String = "human"  ## "human" or "ghost"
+var local_role: String = "human"
 var is_ghost_player: bool = false
 
-## Items needed to escape (The Ghost style)
+## Items needed to escape
 var required_items: Dictionary = {
 	"key_red": false,
 	"key_blue": false,
@@ -43,12 +47,15 @@ var ghost_speed: float = 4.5
 var human_walk_speed: float = 3.5
 var human_sprint_speed: float = 6.0
 var flashlight_battery: float = 100.0
-var flashlight_drain_rate: float = 2.0  ## % per second
-var flashlight_recharge_rate: float = 5.0  ## % per second when off
+var flashlight_drain_rate: float = 2.0
+var flashlight_recharge_rate: float = 5.0
 var ghost_catch_distance: float = 2.0
 var ghost_hunt_interval_min: float = 30.0
 var ghost_hunt_interval_max: float = 60.0
 var ghost_hunt_duration: float = 20.0
+
+## Single player mode flag
+var is_single_player: bool = false
 
 
 func _ready():
@@ -75,13 +82,25 @@ func enter_lobby():
 	reset_game()
 
 
-## Start the actual gameplay
+## Start the actual gameplay (multiplayer version)
 func start_gameplay():
+	is_single_player = false
 	set_state(GameState.PLAYING)
 	alive_humans = _count_humans()
 	total_humans = alive_humans
 	flashlight_battery = 100.0
 	print("[GameManager] Gameplay started! Humans: %d, Ghost: %s" % [alive_humans, "Player/AI"])
+
+
+## Start gameplay in single-player AI Ghost mode
+## This is the KEY fix - properly counts the local player as a human
+func start_gameplay_singleplayer():
+	is_single_player = true
+	set_state(GameState.PLAYING)
+	alive_humans = 1  # The local player is the only human
+	total_humans = 1
+	flashlight_battery = 100.0
+	print("[GameManager] Single-player mode started! You are human, AI is ghost.")
 
 
 ## Reset all game data for a new round
@@ -99,6 +118,7 @@ func reset_game():
 	total_humans = 0
 	local_role = "human"
 	is_ghost_player = false
+	is_single_player = false
 
 
 ## A player has been caught by the ghost
@@ -108,12 +128,21 @@ func on_player_caught(peer_id: int):
 
 	player_caught.emit(peer_id)
 
-	if multiplayer.is_server():
+	# Single-player mode - handle directly
+	if is_single_player:
+		alive_humans -= 1
+		if alive_humans <= 0:
+			_on_ghost_wins()
+		set_state(GameState.CAUGHT)
+		print("[GameManager] You have been caught by the ghost!")
+		return
+
+	# Multiplayer mode
+	if multiplayer.has_multiplayer_peer() and multiplayer.is_server():
 		alive_humans -= 1
 		if alive_humans <= 0:
 			_on_ghost_wins()
 
-	# If this is our local player
 	if peer_id == multiplayer.get_unique_id():
 		set_state(GameState.CAUGHT)
 		print("[GameManager] You have been caught by the ghost!")
@@ -126,7 +155,15 @@ func on_player_escaped(peer_id: int):
 
 	player_escaped.emit(peer_id)
 
-	if multiplayer.is_server():
+	# Single-player mode - handle directly
+	if is_single_player:
+		_on_humans_win()
+		set_state(GameState.ESCAPED)
+		print("[GameManager] You have escaped!")
+		return
+
+	# Multiplayer mode
+	if multiplayer.has_multiplayer_peer() and multiplayer.is_server():
 		alive_humans -= 1
 		if alive_humans <= 0:
 			_on_humans_win()
@@ -141,15 +178,27 @@ func on_item_collected(item_name: String, peer_id: int):
 	if not required_items.has(item_name):
 		return
 
-	if multiplayer.is_server():
+	# Single-player mode - handle directly
+	if is_single_player:
+		if not required_items[item_name]:
+			required_items[item_name] = true
+			items_collected_count += 1
+			item_collected.emit(item_name, peer_id)
+			print("[GameManager] Item collected: %s (%d/%d)" % [item_name, items_collected_count, total_items_required])
+			if items_collected_count >= total_items_required:
+				escape_door_unlocked = true
+				all_items_collected.emit()
+				print("[GameManager] All items collected! Escape door unlocked!")
+		return
+
+	# Multiplayer mode
+	if multiplayer.has_multiplayer_peer() and multiplayer.is_server():
 		if not required_items[item_name]:
 			required_items[item_name] = true
 			items_collected_count += 1
 			_sync_item_state.rpc(item_name, true)
-
 			item_collected.emit(item_name, peer_id)
 			print("[GameManager] Item collected: %s by peer %d (%d/%d)" % [item_name, peer_id, items_collected_count, total_items_required])
-
 			if items_collected_count >= total_items_required:
 				escape_door_unlocked = true
 				all_items_collected.emit()
@@ -171,14 +220,16 @@ func _sync_item_state(item_name: String, collected: bool):
 func _on_ghost_wins():
 	set_state(GameState.GAME_OVER)
 	ghost_victory.emit()
-	_notify_game_result.rpc("ghost_wins")
+	if not is_single_player and multiplayer.has_multiplayer_peer():
+		_notify_game_result.rpc("ghost_wins")
 
 
-## Humans win - at least one escaped or all escaped
+## Humans win
 func _on_humans_win():
 	set_state(GameState.GAME_OVER)
 	human_victory.emit()
-	_notify_game_result.rpc("humans_win")
+	if not is_single_player and multiplayer.has_multiplayer_peer():
+		_notify_game_result.rpc("humans_win")
 
 
 ## Notify all clients about game result
@@ -199,7 +250,9 @@ func _notify_game_result(result: String):
 func return_to_menu():
 	reset_game()
 	set_state(GameState.MENU)
-	NetworkManager.disconnect_game()
+	# Only disconnect if we have a multiplayer peer
+	if multiplayer.has_multiplayer_peer():
+		NetworkManager.disconnect_game()
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 
@@ -207,8 +260,7 @@ func return_to_menu():
 func on_player_left(peer_id: int):
 	if current_state != GameState.PLAYING:
 		return
-
-	if NetworkManager.players.has(peer_id):
+	if not is_single_player and NetworkManager.players.has(peer_id):
 		var role = NetworkManager.players[peer_id].role
 		if role == "human":
 			alive_humans -= 1
@@ -216,20 +268,13 @@ func on_player_left(peer_id: int):
 			if alive_humans <= 0:
 				_on_ghost_wins()
 		elif role == "ghost":
-			# Ghost player left - switch to AI ghost
 			print("[GameManager] Ghost player left, switching to AI ghost")
-			_start_ai_ghost()
 
 
-## Switch to AI ghost when ghost player disconnects
-func _start_ai_ghost():
-	# This would spawn an AI ghost in the game scene
-	# Handled by the game scene
-	pass
-
-
-## Count humans from player list
+## Count humans from player list (multiplayer only)
 func _count_humans() -> int:
+	if is_single_player:
+		return 1
 	var count = 0
 	for pid in NetworkManager.players:
 		if NetworkManager.players[pid].role == "human":

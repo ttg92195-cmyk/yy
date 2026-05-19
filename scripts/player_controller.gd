@@ -1,11 +1,7 @@
 extends CharacterBody3D
 ## PlayerController - MOBILE-OPTIMIZED first-person player
-## V4 - SUPER BRIGHT flashlight, fixed is_alive naming conflict
-## Optimizations:
-## - Reduced head bob amplitude
-## - Simplified flashlight (no complex flicker math)
-## - Heartbeat check less frequent
-## - Removed screen shake (CPU saver on mobile)
+## V7 - ROBUST: No @onready with $ paths, null-safe camera references
+## CRITICAL FIX: @onready $NodePath can return null and crash _physics_process
 
 # Movement
 const MOUSE_SENSITIVITY: float = 0.002
@@ -32,21 +28,20 @@ var head_bob_timer: float = 0.0
 var interact_range: float = 3.0
 var interact_target: Node3D = null
 
-# References
-@onready var head: Node3D = $Head
-@onready var camera: Camera3D = $Head/Camera3D
-@onready var flashlight: SpotLight3D = $Head/Camera3D/Flashlight
-@onready var interact_ray: RayCast3D = $Head/Camera3D/InteractRay
-@onready var collision_shape: CollisionShape3D = $CollisionShape3D
-@onready var step_audio: AudioStreamPlayer3D = $StepAudio
-@onready var heartbeat_audio: AudioStreamPlayer3D = $HeartbeatAudio
-@onready var interact_label: Label3D = $Head/Camera3D/InteractLabel
+# References - SAFE: no @onready with $ paths, use get_node_or_null in _ready
+var head: Node3D = null
+var camera: Camera3D = null
+var flashlight: SpotLight3D = null
+var interact_ray: RayCast3D = null
+var collision_shape: CollisionShape3D = null
+var step_audio: AudioStreamPlayer3D = null
+var heartbeat_audio: AudioStreamPlayer3D = null
+var interact_label: Label3D = null
 
 # Flashlight
 var is_flashlight_on: bool = false
 
-# Player state - CRITICAL: variable is alive_state NOT is_alive
-# (is_alive is also a function name, GDScript 4 does not allow same name)
+# Player state - variable is alive_state NOT is_alive (function name conflict)
 var gravity: float = 9.8
 var peer_id: int = 1
 var is_local_player: bool = false
@@ -61,10 +56,22 @@ var footstep_timer: float = 0.0
 
 
 func _ready():
+	# Get node references SAFELY - NO @onready with $ paths
+	head = get_node_or_null("Head")
+	if head:
+		camera = head.get_node_or_null("Camera3D")
+	if camera:
+		flashlight = camera.get_node_or_null("Flashlight")
+		interact_ray = camera.get_node_or_null("InteractRay")
+		interact_label = camera.get_node_or_null("InteractLabel")
+	collision_shape = get_node_or_null("CollisionShape3D")
+	step_audio = get_node_or_null("StepAudio")
+	heartbeat_audio = get_node_or_null("HeartbeatAudio")
+
 	collision_layer = 2
 	collision_mask = 1 | 4 | 16
 
-	# Flashlight setup - SUPER BRIGHT for mobile
+	# Flashlight setup
 	if flashlight:
 		flashlight.visible = false
 		flashlight.light_energy = 16.0
@@ -94,6 +101,8 @@ func _ready():
 	if interact_label:
 		interact_label.visible = false
 
+	print("[PlayerController] _ready() OK. Camera=%s Flashlight=%s" % [camera != null, flashlight != null])
+
 
 func setup_as_local(player_peer_id: int):
 	peer_id = player_peer_id
@@ -103,6 +112,9 @@ func setup_as_local(player_peer_id: int):
 
 	if camera:
 		camera.current = true
+		print("[PlayerController] Camera set as current")
+	else:
+		push_error("[PlayerController] ERROR: No camera found!")
 
 	var is_mobile = OS.has_feature("android") or OS.has_feature("ios")
 	if not is_mobile:
@@ -117,7 +129,7 @@ func setup_as_local(player_peer_id: int):
 		walk_speed = GameManager.human_walk_speed
 		sprint_speed = GameManager.human_sprint_speed
 
-	# Auto-enable flashlight after delay - SUPER BRIGHT
+	# Auto-enable flashlight after delay
 	if flashlight:
 		get_tree().create_timer(0.5).timeout.connect(func():
 			if is_local_player and flashlight:
@@ -126,6 +138,7 @@ func setup_as_local(player_peer_id: int):
 				flashlight.light_energy = 16.0
 				flashlight.spot_range = 50.0
 				flashlight.spot_angle = 65.0
+				print("[PlayerController] Flashlight ON")
 		)
 
 
@@ -151,8 +164,9 @@ func _input(event: InputEvent):
 	# Mouse look (desktop only)
 	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
 		rotate_y(-event.relative.x * MOUSE_SENSITIVITY)
-		head.rotate_x(-event.relative.y * MOUSE_SENSITIVITY)
-		head.rotation.x = clamp(head.rotation.x, deg_to_rad(-89), deg_to_rad(89))
+		if head:
+			head.rotate_x(-event.relative.y * MOUSE_SENSITIVITY)
+			head.rotation.x = clamp(head.rotation.x, deg_to_rad(-89), deg_to_rad(89))
 
 	# Flashlight toggle
 	if event.is_action_pressed("flashlight"):
@@ -182,20 +196,22 @@ func _physics_process(delta):
 		velocity.x = lerp(velocity.x, direction.x * current_speed, acceleration * delta)
 		velocity.z = lerp(velocity.z, direction.z * current_speed, acceleration * delta)
 
-		# Head bob (simple)
+		# Head bob (null-safe)
 		head_bob_timer += delta * head_bob_frequency * (2.0 if is_sprinting else 1.0)
-		camera.position.y = sin(head_bob_timer) * head_bob_amplitude
+		if camera:
+			camera.position.y = sin(head_bob_timer) * head_bob_amplitude
 	else:
 		velocity.x = lerp(velocity.x, 0.0, deceleration * delta)
 		velocity.z = lerp(velocity.z, 0.0, deceleration * delta)
 		head_bob_timer = 0.0
-		camera.position.y = lerp(camera.position.y, 0.0, 5.0 * delta)
+		if camera:
+			camera.position.y = lerp(camera.position.y, 0.0, 5.0 * delta)
 
 	# Gravity
 	if not is_on_floor():
 		velocity.y -= gravity * delta
 
-	# Footstep sounds (with timer to prevent rapid firing)
+	# Footstep sounds
 	if direction and is_on_floor():
 		footstep_timer += delta
 		var step_interval = 0.45 if is_sprinting else 0.6
@@ -209,10 +225,10 @@ func _physics_process(delta):
 	# Interaction check
 	check_interact()
 
-	# Update flashlight battery (simple - no complex flicker)
+	# Update flashlight battery
 	_update_flashlight(delta)
 
-	# Heartbeat (throttled - every 0.5s instead of every frame)
+	# Heartbeat (throttled)
 	heartbeat_check_timer += delta
 	if heartbeat_check_timer >= heartbeat_check_interval:
 		heartbeat_check_timer = 0.0
@@ -220,7 +236,7 @@ func _physics_process(delta):
 
 	move_and_slide()
 
-	# Sync position to other players
+	# Sync position to other players (only if multiplayer is active)
 	if multiplayer.has_multiplayer_peer():
 		_sync_position.rpc(position, rotation)
 
@@ -270,7 +286,7 @@ func _update_flashlight(delta: float):
 			if randf() < 0.02:
 				flashlight.visible = false
 				get_tree().create_timer(0.1).timeout.connect(func():
-					if is_flashlight_on:
+					if is_flashlight_on and flashlight:
 						flashlight.visible = true
 				)
 
@@ -323,7 +339,7 @@ func check_interact():
 
 func try_interact():
 	if interact_target and interact_target.has_method("on_interact"):
-		interact_target.on_interact(multiplayer.get_unique_id())
+		interact_target.on_interact(peer_id)
 
 
 func current_state_not_playing() -> bool:
@@ -382,11 +398,16 @@ func on_caught_by_ghost():
 
 
 func _show_caught_screen():
+	var canvas = CanvasLayer.new()
+	canvas.layer = 50
+	canvas.name = "CaughtCanvas"
+	add_child(canvas)
+
 	var overlay = ColorRect.new()
 	overlay.color = Color(0.6, 0, 0, 0.0)
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	get_tree().root.add_child(overlay)
+	canvas.add_child(overlay)
 
 	var tween = get_tree().create_tween()
 	tween.tween_property(overlay, "color:a", 0.8, 0.5)
@@ -400,17 +421,7 @@ func _show_caught_screen():
 	label.add_theme_font_size_override("font_size", 48)
 	label.add_theme_color_override("font_color", Color(1, 0.2, 0.2))
 	label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	get_tree().root.add_child(label)
-
-	var sub_label = Label.new()
-	sub_label.text = "The ghost got you..."
-	sub_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	sub_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	sub_label.add_theme_font_size_override("font_size", 24)
-	sub_label.add_theme_color_override("font_color", Color(0.8, 0.5, 0.5))
-	sub_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	sub_label.offset_top = 60
-	get_tree().root.add_child(sub_label)
+	canvas.add_child(label)
 
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	set_process(false)

@@ -1,6 +1,7 @@
 extends Node3D
-# GameScene V6 - NO await in _ready, BULLETPROOF loading
+# GameScene V7 - BULLETPROOF: Fallback camera, loading overlay, single-player fix
 # Every step creates visible output so we NEVER get a black screen
+# Uses start_gameplay_singleplayer() so alive_humans=1 and items work
 
 @export var use_ai_ghost: bool = true
 
@@ -16,6 +17,7 @@ var touch_controls: CanvasLayer = null
 var debug_label: Label = null
 var fallback_camera: Camera3D = null
 var status_label: Label = null
+var loading_canvas: CanvasLayer = null
 
 
 func _ready():
@@ -27,18 +29,21 @@ func _ready():
 	fallback_camera.look_at(Vector3(0, 0, 0), Vector3.UP)
 	add_child(fallback_camera)
 
-	# === STEP 2: Create bright environment IMMEDIATELY ===
+	# === STEP 2: Create LOADING OVERLAY ===
+	_create_loading_overlay()
+
+	# === STEP 3: Create bright environment IMMEDIATELY ===
 	_setup_environment()
 
-	# === STEP 3: Create emergency floor so SOMETHING is visible ===
+	# === STEP 4: Create emergency floor so SOMETHING is visible ===
 	_create_emergency_floor()
 
-	# === STEP 4: Create debug overlay ===
+	# === STEP 5: Create debug overlay ===
 	_setup_debug_overlay()
-	_debug("=== THE GHOST v0.6.0 ===")
+	_debug("=== THE GHOST v0.7.0 ===")
 	_debug("Device: " + OS.get_name())
 
-	# === STEP 5: Create containers ===
+	# === STEP 6: Create containers ===
 	players_container = Node3D.new()
 	players_container.name = "Players"
 	add_child(players_container)
@@ -47,20 +52,23 @@ func _ready():
 	items_container.name = "Items"
 	add_child(items_container)
 
-	# === STEP 6: Load scenes ===
+	# === STEP 7: Load scenes ===
+	_set_loading("Loading player...")
 	player_scene = load("res://scenes/player.tscn")
 	if player_scene:
 		_debug("Player scene: OK")
 	else:
 		_debug("ERROR: Player scene FAILED!")
 
+	_set_loading("Loading ghost...")
 	ghost_ai_scene = load("res://scenes/ghost_ai.tscn")
 	if ghost_ai_scene:
 		_debug("Ghost AI scene: OK")
 	else:
 		_debug("ERROR: Ghost AI scene FAILED!")
 
-	# === STEP 7: Generate map ===
+	# === STEP 8: Generate map ===
+	_set_loading("Building hospital...")
 	_debug("Building hospital map...")
 	var map_script = load("res://scripts/map_generator.gd")
 	if map_script:
@@ -72,38 +80,91 @@ func _ready():
 	else:
 		_debug("ERROR: Map script FAILED! Using emergency floor only.")
 
-	# === STEP 8: Setup spawn points ===
+	# === STEP 9: Setup spawn points ===
 	_setup_spawn_points()
 
-	# === STEP 9: Setup HUD ===
+	# === STEP 10: Setup HUD ===
 	_setup_hud()
 
-	# === STEP 10: Setup touch controls ===
+	# === STEP 11: Setup touch controls ===
 	_setup_touch_controls()
 
-	# === STEP 11: Connect game state ===
+	# === STEP 12: Connect game state ===
 	if GameManager:
 		GameManager.game_state_changed.connect(_on_game_state_changed)
 
-	# === STEP 12: Start game ===
+	# === STEP 13: Start game with SINGLE-PLAYER FIX ===
 	if use_ai_ghost:
 		_start_ai_ghost_game()
 	else:
 		_debug("Not using AI ghost mode")
 
-	# === STEP 13: Schedule cleanup ===
+	# === STEP 14: Schedule cleanup ===
 	get_tree().create_timer(3.0).timeout.connect(_cleanup_fallback)
 	get_tree().create_timer(15.0).timeout.connect(_hide_debug)
 
+	# === STEP 15: Hide loading overlay ===
+	_hide_loading()
+
 	_debug("=== SETUP COMPLETE ===")
+
+
+func _create_loading_overlay():
+	loading_canvas = CanvasLayer.new()
+	loading_canvas.name = "LoadingCanvas"
+	loading_canvas.layer = 200
+	add_child(loading_canvas)
+
+	var bg = ColorRect.new()
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.color = Color(0.02, 0.01, 0.03)
+	loading_canvas.add_child(bg)
+
+	var title = Label.new()
+	title.set_anchors_preset(Control.PRESET_CENTER)
+	title.offset_left = -200
+	title.offset_right = 200
+	title.offset_top = -80
+	title.offset_bottom = -40
+	title.text = "THE GHOST"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 48)
+	title.add_theme_color_override("font_color", Color(0.8, 0.1, 0.1))
+	loading_canvas.add_child(title)
+
+	status_label = Label.new()
+	status_label.set_anchors_preset(Control.PRESET_CENTER)
+	status_label.offset_left = -200
+	status_label.offset_right = 200
+	status_label.offset_top = -10
+	status_label.offset_bottom = 30
+	status_label.text = "Loading..."
+	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	status_label.add_theme_font_size_override("font_size", 22)
+	status_label.add_theme_color_override("font_color", Color(0.9, 0.6, 0.3))
+	loading_canvas.add_child(status_label)
+
+
+func _set_loading(text: String):
+	if status_label:
+		status_label.text = text
+
+
+func _hide_loading():
+	if loading_canvas:
+		loading_canvas.visible = false
 
 
 func _start_ai_ghost_game():
 	_debug("Starting AI Ghost game...")
 
 	if GameManager:
+		# CRITICAL: Reset game state first
+		GameManager.reset_game()
 		GameManager.set_local_role("human")
-		GameManager.start_gameplay()
+		# CRITICAL: Use single-player mode so alive_humans=1 and items work
+		GameManager.start_gameplay_singleplayer()
+		_debug("GameManager: single-player mode, alive_humans=1")
 
 	_spawn_player(1)
 	_spawn_ai_ghost()
@@ -201,32 +262,15 @@ func _setup_debug_overlay():
 	debug_label.add_theme_stylebox_override("normal", bg)
 	canvas.add_child(debug_label)
 
-	var status_canvas = CanvasLayer.new()
-	status_canvas.name = "StatusCanvas"
-	status_canvas.layer = 101
-	add_child(status_canvas)
-
-	status_label = Label.new()
-	status_label.name = "StatusLabel"
-	status_label.position = Vector2(10, 500)
-	status_label.size = Vector2(600, 30)
-	status_label.add_theme_font_size_override("font_size", 16)
-	status_label.add_theme_color_override("font_color", Color(0, 1, 0))
-	var sbg = StyleBoxFlat.new()
-	sbg.bg_color = Color(0, 0, 0, 0.7)
-	status_label.add_theme_stylebox_override("normal", sbg)
-	status_canvas.add_child(status_label)
-
 
 func _debug(msg):
 	print("[GameScene] " + str(msg))
 	if debug_label:
-		debug_label.text += str(msg) + "\n"
-
-
-func _set_status(msg):
-	if status_label:
-		status_label.text = str(msg)
+		var lines = debug_label.text.split("\n")
+		if lines.size() > 18:
+			lines = lines.slice(-17)
+		lines.append(str(msg))
+		debug_label.text = "\n".join(lines)
 
 
 func _setup_spawn_points():
@@ -268,12 +312,14 @@ func _setup_touch_controls():
 
 func _spawn_player(peer_id: int):
 	if not player_scene:
-		_debug("ERROR: No player scene!")
+		_debug("ERROR: No player scene! Creating emergency player...")
+		_create_emergency_player()
 		return
 
 	var player = player_scene.instantiate()
 	if not player:
 		_debug("ERROR: Player instantiate failed!")
+		_create_emergency_player()
 		return
 
 	player.name = "Player_%d" % peer_id
@@ -298,6 +344,67 @@ func _spawn_player(peer_id: int):
 	player.add_to_group("player")
 	_add_player_body(player)
 	_debug("Player at: " + str(player.global_position))
+
+
+func _create_emergency_player():
+	# Create a minimal player if the scene fails to load
+	var player = CharacterBody3D.new()
+	player.name = "EmergencyPlayer"
+	player.collision_layer = 2
+	player.collision_mask = 1 | 4 | 16
+
+	var col = CollisionShape3D.new()
+	var shape = CapsuleShape3D.new()
+	shape.radius = 0.4
+	shape.height = 1.8
+	col.shape = shape
+	col.position = Vector3(0, 0.9, 0)
+	player.add_child(col)
+
+	var head_node = Node3D.new()
+	head_node.name = "Head"
+	head_node.position = Vector3(0, 1.6, 0)
+	player.add_child(head_node)
+
+	var cam = Camera3D.new()
+	cam.name = "Camera3D"
+	cam.current = true
+	cam.fov = 75.0
+	head_node.add_child(cam)
+
+	var flash = SpotLight3D.new()
+	flash.name = "Flashlight"
+	flash.visible = true
+	flash.light_energy = 16.0
+	flash.spot_range = 50.0
+	flash.spot_angle = 65.0
+	flash.spot_attenuation = 0.2
+	flash.shadow_enabled = false
+	head_node.add_child(flash)
+
+	var step = AudioStreamPlayer3D.new()
+	step.name = "StepAudio"
+	step.max_distance = 15.0
+	player.add_child(step)
+
+	var heartbeat = AudioStreamPlayer3D.new()
+	heartbeat.name = "HeartbeatAudio"
+	heartbeat.max_distance = 5.0
+	player.add_child(heartbeat)
+
+	# Apply player controller script
+	var pc_script = load("res://scripts/player_controller.gd")
+	if pc_script:
+		player.set_script(pc_script)
+		player.set("alive_state", true)
+		player.set("is_local_player", true)
+		player.set("peer_id", 1)
+
+	player.position = Vector3(0, 0.5, 0)
+	players_container.add_child(player)
+
+	player.add_to_group("player")
+	_debug("Emergency player created!")
 
 
 func _add_player_body(player: CharacterBody3D):
