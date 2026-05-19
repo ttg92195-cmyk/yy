@@ -24,10 +24,10 @@ fov = 75.0
 
 [node name="Flashlight" type="SpotLight3D" parent="Head/Camera3D"]
 visible = false
-light_energy = 8.0
-spot_range = 35.0
-spot_angle = 55.0
-spot_attenuation = 0.2
+light_energy = 16.0
+spot_range = 50.0
+spot_angle = 65.0
+spot_attenuation = 0.15
 shadow_enabled = false
 
 [node name="InteractRay" type="RayCast3D" parent="Head/Camera3D"]

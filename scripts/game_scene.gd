@@ -1,8 +1,7 @@
 extends Node3D
 ## GameScene - Mobile-optimized game scene
-## Robust version with error handling and debug output
-## NO NavigationMesh baking (causes freeze)
-## NO AudioStreamGenerator (causes crash)
+## V2 - EXTREMELY BRIGHT for mobile screens
+## Debug label shows loading state
 
 @export var use_ai_ghost: bool = true
 
@@ -22,7 +21,8 @@ var debug_label: Label = null
 func _ready():
 	# Debug label - always visible so we can see what's happening
 	_create_debug_label()
-	_debug("Game loading...")
+	_debug("=== THE GHOST v0.3.0 ===")
+	_debug("Loading game...")
 
 	# Containers
 	players_container = Node3D.new()
@@ -34,7 +34,6 @@ func _ready():
 	add_child(items_container)
 
 	_debug("Creating map...")
-	# Generate hospital map
 	var map_script = load("res://scripts/map_generator.gd")
 	if map_script:
 		map_generator = Node3D.new()
@@ -43,18 +42,17 @@ func _ready():
 		add_child(map_generator)
 		_debug("Map script loaded OK")
 	else:
-		_debug("ERROR: Map script failed to load!")
-		# Create emergency floor so player doesn't fall
+		_debug("ERROR: Map script failed!")
 		_create_emergency_floor()
 
 	# Wait for map to generate
 	await get_tree().process_frame
-	_debug("Map generated, setting up...")
+	_debug("Map generated OK!")
 
 	# Spawn points
 	_find_spawn_points()
 
-	# Environment - MUST be bright for mobile
+	# Environment - EXTREMELY BRIGHT for mobile
 	_setup_environment()
 	_debug("Environment ready")
 
@@ -62,7 +60,7 @@ func _ready():
 	_setup_hud()
 	_debug("HUD ready")
 
-	# Touch controls (always create for mobile)
+	# Touch controls
 	_setup_touch_controls()
 	_debug("Touch controls ready")
 
@@ -75,36 +73,38 @@ func _ready():
 		GameManager.start_gameplay()
 		_spawn_player(1)
 		_spawn_ai_ghost()
-		_debug("Game started! Player and ghost spawned.")
+		_debug("GAME STARTED! Look around!")
 
-	# Hide debug label after 5 seconds
-	get_tree().create_timer(5.0).timeout.connect(func():
+	# Hide debug label after 8 seconds
+	get_tree().create_timer(8.0).timeout.connect(func():
 		if debug_label:
 			debug_label.visible = false
 	)
 
 
 func _create_debug_label():
-	## Create a debug label that shows game state
 	debug_label = Label.new()
 	debug_label.name = "DebugLabel"
 	debug_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	debug_label.offset_left = 10
 	debug_label.offset_top = 10
-	debug_label.offset_right = 400
-	debug_label.offset_bottom = 200
-	debug_label.add_theme_font_size_override("font_size", 14)
+	debug_label.offset_right = 500
+	debug_label.offset_bottom = 250
+	debug_label.add_theme_font_size_override("font_size", 16)
 	debug_label.add_theme_color_override("font_color", Color(1, 1, 0))
-	# Black background for readability
 	var bg = StyleBoxFlat.new()
-	bg.bg_color = Color(0, 0, 0, 0.7)
+	bg.bg_color = Color(0, 0, 0, 0.8)
+	bg.border_color = Color(1, 0.5, 0)
+	bg.border_width_bottom = 2
+	bg.border_width_top = 2
+	bg.border_width_left = 2
+	bg.border_width_right = 2
 	bg.corner_radius_top_left = 4
 	bg.corner_radius_top_right = 4
 	bg.corner_radius_bottom_left = 4
 	bg.corner_radius_bottom_right = 4
 	debug_label.add_theme_stylebox_override("normal", bg)
 
-	# Add to a CanvasLayer so it's always on top
 	var canvas = CanvasLayer.new()
 	canvas.layer = 100
 	canvas.name = "DebugCanvas"
@@ -113,14 +113,12 @@ func _create_debug_label():
 
 
 func _debug(msg: String):
-	## Print debug message to both console and screen
 	print("[GameScene] " + msg)
 	if debug_label:
 		debug_label.text += msg + "\n"
 
 
 func _create_emergency_floor():
-	## Create a simple visible floor if map generation fails
 	var floor_body = StaticBody3D.new()
 	floor_body.collision_layer = 1
 	var col = CollisionShape3D.new()
@@ -129,15 +127,15 @@ func _create_emergency_floor():
 	col.shape = shape
 	floor_body.add_child(col)
 
-	var mesh = MeshInstance3D.new()
+	var mesh_inst = MeshInstance3D.new()
 	var box = BoxMesh.new()
 	box.size = Vector3(50, 0.5, 50)
-	mesh.mesh = box
+	mesh_inst.mesh = box
 	var mat = StandardMaterial3D.new()
-	mat.albedo_color = Color(0.4, 0.1, 0.1)  # Red tint so user sees it
+	mat.albedo_color = Color(0.6, 0.15, 0.15)
 	mat.roughness = 0.9
-	mesh.set_surface_override_material(mat)
-	floor_body.add_child(mesh)
+	mesh_inst.set_surface_override_material(mat)
+	floor_body.add_child(mesh_inst)
 	floor_body.position = Vector3(0, -0.25, 0)
 	add_child(floor_body)
 
@@ -163,25 +161,25 @@ func _setup_environment():
 
 	var env = Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.02, 0.02, 0.04, 1)
+	env.background_color = Color(0.08, 0.08, 0.12, 1)
 
-	# Ambient light - VERY bright for mobile visibility
+	# Ambient light - EXTREMELY BRIGHT for mobile
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.45, 0.40, 0.45, 1)
-	env.ambient_light_energy = 5.0
+	env.ambient_light_color = Color(0.6, 0.55, 0.6, 1)
+	env.ambient_light_energy = 8.0
 
-	# Fog - very light, just for atmosphere
+	# Fog - VERY light
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.08, 0.07, 0.10, 1)
-	env.fog_density = 0.003
-	env.fog_depth_begin = 20.0
-	env.fog_depth_end = 60.0
+	env.fog_light_color = Color(0.15, 0.12, 0.18, 1)
+	env.fog_density = 0.002
+	env.fog_depth_begin = 30.0
+	env.fog_depth_end = 80.0
 
-	# Tone mapping - high exposure for mobile
+	# Tone mapping - MAXIMUM exposure
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.tonemap_exposure = 2.0
+	env.tonemap_exposure = 2.5
 
-	# Disable expensive effects for mobile
+	# Disable expensive effects
 	env.glow_enabled = false
 	env.ssao_enabled = false
 	env.ssr_enabled = false
@@ -190,13 +188,21 @@ func _setup_environment():
 	world_env.environment = env
 	add_child(world_env)
 
-	# Moonlight - bright for mobile
+	# Moonlight - VERY bright
 	var dir = DirectionalLight3D.new()
-	dir.light_energy = 1.0
-	dir.light_color = Color(0.5, 0.5, 0.7)
+	dir.light_energy = 1.5
+	dir.light_color = Color(0.6, 0.6, 0.8)
 	dir.rotation = Vector3(deg_to_rad(-70), deg_to_rad(25), 0)
 	dir.shadow_enabled = false
 	add_child(dir)
+
+	# Second directional light from opposite side for fill
+	var dir2 = DirectionalLight3D.new()
+	dir2.light_energy = 0.8
+	dir2.light_color = Color(0.5, 0.5, 0.6)
+	dir2.rotation = Vector3(deg_to_rad(-45), deg_to_rad(-135), 0)
+	dir2.shadow_enabled = false
+	add_child(dir2)
 
 
 func _setup_hud():
@@ -206,7 +212,7 @@ func _setup_hud():
 		hud.set_script(hud_script)
 		add_child(hud)
 	else:
-		_debug("ERROR: HUD script failed to load!")
+		_debug("ERROR: HUD script failed!")
 
 
 func _setup_touch_controls():
@@ -216,7 +222,7 @@ func _setup_touch_controls():
 		touch_controls.set_script(tc_script)
 		add_child(touch_controls)
 	else:
-		_debug("ERROR: Touch controls script failed to load!")
+		_debug("ERROR: Touch controls script failed!")
 
 
 func _on_game_state_changed(new_state):
@@ -229,7 +235,7 @@ func _on_game_state_changed(new_state):
 func _spawn_player(peer_id: int):
 	var player = PLAYER_SCENE.instantiate()
 	if not player:
-		_debug("ERROR: Player scene failed to instantiate!")
+		_debug("ERROR: Player scene failed!")
 		return
 
 	player.name = "Player_%d" % peer_id
@@ -238,21 +244,17 @@ func _spawn_player(peer_id: int):
 		player.position.y = 0.5
 	players_container.add_child(player)
 
-	# Setup as local player
 	if player.has_method("setup_as_local"):
 		player.setup_as_local(peer_id)
-		_debug("Player setup OK")
+		_debug("Player spawned OK at (0, 0.5, 0)")
 	else:
-		_debug("ERROR: Player missing setup_as_local method!")
+		_debug("ERROR: Player missing setup_as_local!")
 
 	player.add_to_group("player")
-
-	# Add visible body mesh
 	_add_player_body(player)
 
 
 func _add_player_body(player: CharacterBody3D):
-	## Add a simple 3D body mesh to the player
 	var body_node = player.get_node_or_null("BodyMesh")
 	if body_node and body_node is MeshInstance3D:
 		var capsule = CapsuleMesh.new()
@@ -260,11 +262,10 @@ func _add_player_body(player: CharacterBody3D):
 		capsule.height = 1.4
 		body_node.mesh = capsule
 		var body_mat = StandardMaterial3D.new()
-		body_mat.albedo_color = Color(0.25, 0.22, 0.2)
+		body_mat.albedo_color = Color(0.4, 0.35, 0.3)
 		body_mat.roughness = 0.9
 		body_node.set_surface_override_material(body_mat)
 
-	# Add head sphere
 	var head_visual = MeshInstance3D.new()
 	var head_mesh_res = SphereMesh.new()
 	head_mesh_res.radius = 0.18
@@ -272,7 +273,7 @@ func _add_player_body(player: CharacterBody3D):
 	head_visual.mesh = head_mesh_res
 	head_visual.position = Vector3(0, 1.55, 0)
 	var head_mat = StandardMaterial3D.new()
-	head_mat.albedo_color = Color(0.6, 0.5, 0.45)
+	head_mat.albedo_color = Color(0.7, 0.6, 0.5)
 	head_mat.roughness = 0.8
 	head_visual.set_surface_override_material(head_mat)
 	player.add_child(head_visual)
@@ -281,7 +282,7 @@ func _add_player_body(player: CharacterBody3D):
 func _spawn_ai_ghost():
 	var ghost = GHOST_AI_SCENE.instantiate()
 	if not ghost:
-		_debug("ERROR: Ghost scene failed to instantiate!")
+		_debug("ERROR: Ghost scene failed!")
 		return
 
 	ghost.name = "GhostAI"
@@ -289,7 +290,7 @@ func _spawn_ai_ghost():
 		ghost.global_position = ghost_spawn_point.global_position
 		ghost.position.y = 0.5
 	players_container.add_child(ghost)
-	_debug("Ghost spawned OK")
+	_debug("Ghost spawned at (0, 0.5, -10)")
 
 
 func _show_game_over(winner: String):

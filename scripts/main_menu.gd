@@ -210,10 +210,10 @@ func _create_ui():
 
 	# Version label
 	version_label = Label.new()
-	version_label.text = "v0.2.0 - Alpha"
+	version_label.text = "v0.3.0 - BRIGHT FIX"
 	version_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	version_label.add_theme_color_override("font_color", Color(0.3, 0.25, 0.3))
-	version_label.add_theme_font_size_override("font_size", 12)
+	version_label.add_theme_color_override("font_color", Color(1, 0.5, 0))
+	version_label.add_theme_font_size_override("font_size", 18)
 	main_vbox.add_child(version_label)
 
 	# ---- JOIN PANEL ----

@@ -65,9 +65,9 @@ func _ready():
         # Flashlight setup - BRIGHT for mobile visibility
         if flashlight:
                 flashlight.visible = false
-                flashlight.light_energy = 8.0
-                flashlight.spot_range = 35.0
-                flashlight.spot_angle = 55.0
+                flashlight.light_energy = 16.0
+                flashlight.spot_range = 50.0
+                flashlight.spot_angle = 65.0
                 flashlight.spot_attenuation = 0.2
                 flashlight.shadow_enabled = false
 
@@ -121,9 +121,9 @@ func setup_as_local(player_peer_id: int):
                         if is_local_player and flashlight:
                                 is_flashlight_on = true
                                 flashlight.visible = true
-                                flashlight.light_energy = 8.0
-                                flashlight.spot_range = 35.0
-                                flashlight.spot_angle = 55.0
+                                flashlight.light_energy = 16.0
+                                flashlight.spot_range = 50.0
+                                flashlight.spot_angle = 65.0
                 )
 
 
@@ -261,8 +261,8 @@ func _update_flashlight(delta: float):
                 GameManager.update_flashlight(delta, true)
                 var battery_ratio = GameManager.flashlight_battery / 100.0
 
-                flashlight.light_energy = lerp(4.0, 8.0, battery_ratio)
-                flashlight.spot_range = lerp(18.0, 35.0, battery_ratio)
+                flashlight.light_energy = lerp(8.0, 16.0, battery_ratio)
+                flashlight.spot_range = lerp(25.0, 50.0, battery_ratio)
 
                 # Low battery - occasional flicker
                 if battery_ratio < 0.15:
