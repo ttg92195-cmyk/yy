@@ -1,5 +1,6 @@
 extends CharacterBody3D
 ## PlayerController - MOBILE-OPTIMIZED first-person player
+## V4 - SUPER BRIGHT flashlight, fixed is_alive naming conflict
 ## Optimizations:
 ## - Reduced head bob amplitude
 ## - Simplified flashlight (no complex flicker math)
@@ -44,15 +45,16 @@ var interact_target: Node3D = null
 # Flashlight
 var is_flashlight_on: bool = false
 
-# Player state
+# Player state - CRITICAL: variable is alive_state NOT is_alive
+# (is_alive is also a function name, GDScript 4 does not allow same name)
 var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var peer_id: int = 1
 var is_local_player: bool = false
-var is_alive: bool = true
+var alive_state: bool = true
 
 # Heartbeat timer (throttled)
 var heartbeat_check_timer: float = 0.0
-var heartbeat_check_interval: float = 0.5  # Check every 0.5s instead of every frame
+var heartbeat_check_interval: float = 0.5
 
 # Footstep timer
 var footstep_timer: float = 0.0
@@ -62,13 +64,13 @@ func _ready():
 	collision_layer = 2
 	collision_mask = 1 | 4 | 16
 
-	# Flashlight setup
+	# Flashlight setup - SUPER BRIGHT for mobile
 	if flashlight:
 		flashlight.visible = false
-		flashlight.light_energy = 4.0
-		flashlight.spot_range = 25.0
-		flashlight.spot_angle = 50.0
-		flashlight.spot_attenuation = 0.3
+		flashlight.light_energy = 16.0
+		flashlight.spot_range = 50.0
+		flashlight.spot_angle = 65.0
+		flashlight.spot_attenuation = 0.2
 		flashlight.shadow_enabled = false
 
 	# Load sounds
@@ -96,7 +98,7 @@ func _ready():
 func setup_as_local(player_peer_id: int):
 	peer_id = player_peer_id
 	is_local_player = true
-	is_alive = true
+	alive_state = true
 	name = "Player_%d" % peer_id
 
 	if camera:
@@ -115,15 +117,15 @@ func setup_as_local(player_peer_id: int):
 		walk_speed = GameManager.human_walk_speed
 		sprint_speed = GameManager.human_sprint_speed
 
-	# Auto-enable flashlight after delay
+	# Auto-enable flashlight after delay - SUPER BRIGHT
 	if flashlight:
 		get_tree().create_timer(0.5).timeout.connect(func():
 			if is_local_player and flashlight:
 				is_flashlight_on = true
 				flashlight.visible = true
-				flashlight.light_energy = 4.0
-				flashlight.spot_range = 25.0
-				flashlight.spot_angle = 50.0
+				flashlight.light_energy = 16.0
+				flashlight.spot_range = 50.0
+				flashlight.spot_angle = 65.0
 		)
 
 
@@ -140,7 +142,7 @@ func setup_as_remote(player_peer_id: int):
 
 
 func _input(event: InputEvent):
-	if not is_local_player or not is_alive:
+	if not is_local_player or not alive_state:
 		return
 
 	if current_state_not_playing():
@@ -162,7 +164,7 @@ func _input(event: InputEvent):
 
 
 func _physics_process(delta):
-	if not is_local_player or not is_alive:
+	if not is_local_player or not alive_state:
 		return
 
 	if current_state_not_playing():
@@ -202,7 +204,7 @@ func _physics_process(delta):
 			if step_audio and not step_audio.playing:
 				step_audio.play()
 	else:
-		footstep_timer = 0.3  # Quick first step when starting to move
+		footstep_timer = 0.3
 
 	# Interaction check
 	check_interact()
@@ -250,19 +252,18 @@ func toggle_flashlight():
 		flashlight.visible = is_flashlight_on
 		if is_flashlight_on:
 			var battery_ratio = GameManager.flashlight_battery / 100.0
-			flashlight.light_energy = lerp(2.0, 4.0, battery_ratio)
-			flashlight.spot_range = lerp(12.0, 25.0, battery_ratio)
-			flashlight.spot_angle = 50.0
+			flashlight.light_energy = lerp(8.0, 16.0, battery_ratio)
+			flashlight.spot_range = lerp(25.0, 50.0, battery_ratio)
+			flashlight.spot_angle = 65.0
 
 
 func _update_flashlight(delta: float):
-	## Simple flashlight update - no complex flicker math
 	if flashlight and is_flashlight_on:
 		GameManager.update_flashlight(delta, true)
 		var battery_ratio = GameManager.flashlight_battery / 100.0
 
-		flashlight.light_energy = lerp(2.0, 4.0, battery_ratio)
-		flashlight.spot_range = lerp(12.0, 25.0, battery_ratio)
+		flashlight.light_energy = lerp(8.0, 16.0, battery_ratio)
+		flashlight.spot_range = lerp(25.0, 50.0, battery_ratio)
 
 		# Low battery - occasional flicker
 		if battery_ratio < 0.15:
@@ -282,7 +283,6 @@ func _update_flashlight(delta: float):
 
 
 func _update_heartbeat():
-	## Throttled heartbeat check (called every 0.5s instead of every frame)
 	if GameManager.is_ghost_player:
 		return
 
@@ -331,7 +331,6 @@ func current_state_not_playing() -> bool:
 
 
 func _add_flashlight_visual():
-	## Add 3D flashlight model from GLB file
 	if not camera:
 		return
 
@@ -373,9 +372,9 @@ func _sync_position(pos: Vector3, rot: Vector3):
 
 
 func on_caught_by_ghost():
-	if not is_alive:
+	if not alive_state:
 		return
-	is_alive = false
+	alive_state = false
 	GameManager.on_player_caught(peer_id)
 
 	if is_local_player:
@@ -418,4 +417,4 @@ func _show_caught_screen():
 
 
 func is_alive() -> bool:
-	return is_alive
+	return alive_state

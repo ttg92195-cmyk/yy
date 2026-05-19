@@ -1,14 +1,11 @@
 extends Node3D
-## GameScene - ULTRA LIGHTWEIGHT for mobile
-## NO NavigationMesh baking (was causing freeze/crash)
-## Ghost moves directly to target instead
-## NO AudioStreamGenerator (was causing crash)
-## Minimal environment setup
+## GameScene - Mobile-optimized game scene
+## V4 - SUPER BRIGHT, FULL MAP, VISIBLE on mobile
+## Debug label shows loading state
 
 @export var use_ai_ghost: bool = true
 
 const PLAYER_SCENE = preload("res://scenes/player.tscn")
-const GHOST_PLAYER_SCENE = preload("res://scenes/ghost_player.tscn")
 const GHOST_AI_SCENE = preload("res://scenes/ghost_ai.tscn")
 
 var player_spawn_points: Array[Marker3D] = []
@@ -18,9 +15,16 @@ var players_container: Node3D = null
 var items_container: Node3D = null
 var hud: CanvasLayer = null
 var touch_controls: CanvasLayer = null
+var debug_label: Label = null
 
 
 func _ready():
+	# Debug label - always visible so we can see what's happening
+	_create_debug_label()
+	_debug("=== THE GHOST v0.4.0 ===")
+	_debug("Loading game...")
+
+	# Containers
 	players_container = Node3D.new()
 	players_container.name = "Players"
 	add_child(players_container)
@@ -29,42 +33,115 @@ func _ready():
 	items_container.name = "Items"
 	add_child(items_container)
 
-	# Generate map
-	map_generator = Node3D.new()
-	map_generator.name = "Map"
-	map_generator.set_script(load("res://scripts/map_generator.gd"))
-	add_child(map_generator)
+	_debug("Creating map...")
+	var map_script = load("res://scripts/map_generator.gd")
+	if map_script:
+		map_generator = Node3D.new()
+		map_generator.name = "Map"
+		map_generator.set_script(map_script)
+		add_child(map_generator)
+		_debug("Map script loaded OK")
+	else:
+		_debug("ERROR: Map script failed!")
+		_create_emergency_floor()
 
+	# Wait for map to generate
 	await get_tree().process_frame
-
-	# NO NavigationMesh baking - this was causing the freeze!
-	# Ghost uses direct movement instead of nav mesh pathfinding
+	_debug("Map generated OK!")
 
 	# Spawn points
 	_find_spawn_points()
 
-	# Simple environment
+	# Environment - SUPER BRIGHT for mobile
 	_setup_environment()
+	_debug("Environment ready")
 
 	# HUD
 	_setup_hud()
+	_debug("HUD ready")
 
-	# Touch controls (always create)
+	# Touch controls
 	_setup_touch_controls()
+	_debug("Touch controls ready")
 
 	# Connect game state
 	GameManager.game_state_changed.connect(_on_game_state_changed)
 
-	# Start game
+	# Start game with AI ghost
 	if use_ai_ghost:
 		GameManager.set_local_role("human")
 		GameManager.start_gameplay()
 		_spawn_player(1)
 		_spawn_ai_ghost()
+		_debug("GAME STARTED! Look around!")
+
+	# Hide debug label after 10 seconds
+	get_tree().create_timer(10.0).timeout.connect(func():
+		if debug_label:
+			debug_label.visible = false
+	)
+
+
+func _create_debug_label():
+	debug_label = Label.new()
+	debug_label.name = "DebugLabel"
+	debug_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	debug_label.offset_left = 10
+	debug_label.offset_top = 10
+	debug_label.offset_right = 500
+	debug_label.offset_bottom = 250
+	debug_label.add_theme_font_size_override("font_size", 16)
+	debug_label.add_theme_color_override("font_color", Color(1, 1, 0))
+	var bg = StyleBoxFlat.new()
+	bg.bg_color = Color(0, 0, 0, 0.8)
+	bg.border_color = Color(1, 0.5, 0)
+	bg.border_width_bottom = 2
+	bg.border_width_top = 2
+	bg.border_width_left = 2
+	bg.border_width_right = 2
+	bg.corner_radius_top_left = 4
+	bg.corner_radius_top_right = 4
+	bg.corner_radius_bottom_left = 4
+	bg.corner_radius_bottom_right = 4
+	debug_label.add_theme_stylebox_override("normal", bg)
+
+	var canvas = CanvasLayer.new()
+	canvas.layer = 100
+	canvas.name = "DebugCanvas"
+	add_child(canvas)
+	canvas.add_child(debug_label)
+
+
+func _debug(msg: String):
+	print("[GameScene] " + msg)
+	if debug_label:
+		debug_label.text += msg + "\n"
+
+
+func _create_emergency_floor():
+	var floor_body = StaticBody3D.new()
+	floor_body.collision_layer = 1
+	var col = CollisionShape3D.new()
+	var shape = BoxShape3D.new()
+	shape.size = Vector3(50, 0.5, 50)
+	col.shape = shape
+	floor_body.add_child(col)
+
+	var mesh_inst = MeshInstance3D.new()
+	var box = BoxMesh.new()
+	box.size = Vector3(50, 0.5, 50)
+	mesh_inst.mesh = box
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = Color(0.6, 0.15, 0.15)
+	mat.roughness = 0.9
+	mesh_inst.set_surface_override_material(mat)
+	floor_body.add_child(mesh_inst)
+	floor_body.position = Vector3(0, -0.25, 0)
+	add_child(floor_body)
 
 
 func _find_spawn_points():
-	var positions = [Vector3(0,0,0), Vector3(5,0,0), Vector3(-5,0,0)]
+	var positions = [Vector3(0, 0, 0), Vector3(-5, 0, 0), Vector3(5, 0, 0)]
 	for i in range(positions.size()):
 		var s = Marker3D.new()
 		s.position = positions[i]
@@ -84,49 +161,76 @@ func _setup_environment():
 
 	var env = Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.02, 0.02, 0.04, 1)
+	env.background_color = Color(0.12, 0.10, 0.14, 1)
 
-	# Bright enough to see on mobile
+	# Ambient light - SUPER BRIGHT for mobile visibility
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.2, 0.17, 0.22, 1)
-	env.ambient_light_energy = 2.0
+	env.ambient_light_color = Color(0.8, 0.75, 0.8, 1)
+	env.ambient_light_energy = 12.0
 
-	# Light fog
+	# Fog - VERY light
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.05, 0.05, 0.08, 1)
-	env.fog_density = 0.012
-	env.fog_depth_begin = 8.0
-	env.fog_depth_end = 35.0
+	env.fog_light_color = Color(0.2, 0.18, 0.22, 1)
+	env.fog_density = 0.001
+	env.fog_depth_begin = 40.0
+	env.fog_depth_end = 100.0
 
+	# Tone mapping - MAXIMUM exposure for mobile
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.tonemap_exposure = 1.3
+	env.tonemap_exposure = 3.0
 
-	# NO glow, NO SSAO
+	# Disable expensive effects for mobile
 	env.glow_enabled = false
 	env.ssao_enabled = false
+	env.ssr_enabled = false
+	env.sdfgi_enabled = false
 
 	world_env.environment = env
 	add_child(world_env)
 
-	# Single moonlight
+	# Moonlight - VERY bright
 	var dir = DirectionalLight3D.new()
-	dir.light_energy = 0.5
-	dir.light_color = Color(0.4, 0.4, 0.6)
-	dir.rotation = Vector3(deg_to_rad(-60), deg_to_rad(30), 0)
+	dir.light_energy = 2.5
+	dir.light_color = Color(0.7, 0.7, 0.85)
+	dir.rotation = Vector3(deg_to_rad(-70), deg_to_rad(25), 0)
 	dir.shadow_enabled = false
 	add_child(dir)
 
+	# Second directional light from opposite side for fill
+	var dir2 = DirectionalLight3D.new()
+	dir2.light_energy = 1.5
+	dir2.light_color = Color(0.6, 0.6, 0.7)
+	dir2.rotation = Vector3(deg_to_rad(-45), deg_to_rad(-135), 0)
+	dir2.shadow_enabled = false
+	add_child(dir2)
+
+	# Third directional light from below for extra fill
+	var dir3 = DirectionalLight3D.new()
+	dir3.light_energy = 0.8
+	dir3.light_color = Color(0.5, 0.45, 0.55)
+	dir3.rotation = Vector3(deg_to_rad(45), deg_to_rad(90), 0)
+	dir3.shadow_enabled = false
+	add_child(dir3)
+
 
 func _setup_hud():
-	hud = CanvasLayer.new()
-	hud.set_script(load("res://scripts/hud.gd"))
-	add_child(hud)
+	var hud_script = load("res://scripts/hud.gd")
+	if hud_script:
+		hud = CanvasLayer.new()
+		hud.set_script(hud_script)
+		add_child(hud)
+	else:
+		_debug("ERROR: HUD script failed!")
 
 
 func _setup_touch_controls():
-	touch_controls = CanvasLayer.new()
-	touch_controls.set_script(load("res://scripts/touch_controls.gd"))
-	add_child(touch_controls)
+	var tc_script = load("res://scripts/touch_controls.gd")
+	if tc_script:
+		touch_controls = CanvasLayer.new()
+		touch_controls.set_script(tc_script)
+		add_child(touch_controls)
+	else:
+		_debug("ERROR: Touch controls script failed!")
 
 
 func _on_game_state_changed(new_state):
@@ -138,28 +242,69 @@ func _on_game_state_changed(new_state):
 
 func _spawn_player(peer_id: int):
 	var player = PLAYER_SCENE.instantiate()
+	if not player:
+		_debug("ERROR: Player scene failed!")
+		return
+
 	player.name = "Player_%d" % peer_id
 	if player_spawn_points.size() > 0:
 		player.global_position = player_spawn_points[0].global_position
 		player.position.y = 0.5
 	players_container.add_child(player)
-	player.setup_as_local(peer_id)
+
+	if player.has_method("setup_as_local"):
+		player.setup_as_local(peer_id)
+		_debug("Player spawned OK at (0, 0.5, 0)")
+	else:
+		_debug("ERROR: Player missing setup_as_local!")
+
 	player.add_to_group("player")
+	_add_player_body(player)
+
+
+func _add_player_body(player: CharacterBody3D):
+	var body_node = player.get_node_or_null("BodyMesh")
+	if body_node and body_node is MeshInstance3D:
+		var capsule = CapsuleMesh.new()
+		capsule.radius = 0.3
+		capsule.height = 1.4
+		body_node.mesh = capsule
+		var body_mat = StandardMaterial3D.new()
+		body_mat.albedo_color = Color(0.4, 0.35, 0.3)
+		body_mat.roughness = 0.9
+		body_node.set_surface_override_material(body_mat)
+
+	var head_visual = MeshInstance3D.new()
+	var head_mesh_res = SphereMesh.new()
+	head_mesh_res.radius = 0.18
+	head_mesh_res.height = 0.3
+	head_visual.mesh = head_mesh_res
+	head_visual.position = Vector3(0, 1.55, 0)
+	var head_mat = StandardMaterial3D.new()
+	head_mat.albedo_color = Color(0.7, 0.6, 0.5)
+	head_mat.roughness = 0.8
+	head_visual.set_surface_override_material(head_mat)
+	player.add_child(head_visual)
 
 
 func _spawn_ai_ghost():
 	var ghost = GHOST_AI_SCENE.instantiate()
+	if not ghost:
+		_debug("ERROR: Ghost scene failed!")
+		return
+
 	ghost.name = "GhostAI"
 	if ghost_spawn_point:
 		ghost.global_position = ghost_spawn_point.global_position
 		ghost.position.y = 0.5
 	players_container.add_child(ghost)
+	_debug("Ghost spawned at (0, 0.5, -10)")
 
 
 func _show_game_over(winner: String):
 	var overlay = ColorRect.new()
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.color = Color(0.3, 0, 0, 0.8) if winner == "ghost" else Color(0, 0.3, 0, 0.8)
+	overlay.color = Color(0.3, 0, 0, 0.85) if winner == "ghost" else Color(0, 0.25, 0, 0.85)
 	get_tree().root.add_child(overlay)
 
 	var label = Label.new()
@@ -168,16 +313,43 @@ func _show_game_over(winner: String):
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", 42)
 	if winner == "ghost":
-		label.text = "THE GHOST WINS!"
+		label.text = "THE GHOST GOT YOU!"
 		label.add_theme_color_override("font_color", Color(1, 0.2, 0.2))
 	else:
 		label.text = "YOU ESCAPED!"
 		label.add_theme_color_override("font_color", Color(0.2, 1, 0.2))
 	get_tree().root.add_child(label)
 
+	var sub_label = Label.new()
+	sub_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	sub_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	sub_label.offset_top = 60
+	sub_label.add_theme_font_size_override("font_size", 20)
+	if winner == "ghost":
+		sub_label.text = "Better luck next time..."
+		sub_label.add_theme_color_override("font_color", Color(0.7, 0.4, 0.4))
+	else:
+		sub_label.text = "You found all the keys and escaped!"
+		sub_label.add_theme_color_override("font_color", Color(0.4, 0.7, 0.4))
+	get_tree().root.add_child(sub_label)
+
 	var btn = Button.new()
-	btn.text = "Menu"
-	btn.position = Vector2(get_viewport().size.x / 2 - 80, get_viewport().size.y / 2 + 70)
-	btn.size = Vector2(160, 45)
+	btn.text = "BACK TO MENU"
+	btn.position = Vector2(get_viewport().size.x / 2 - 90, get_viewport().size.y / 2 + 80)
+	btn.size = Vector2(180, 45)
+	var btn_style = StyleBoxFlat.new()
+	btn_style.bg_color = Color(0.15, 0.04, 0.04, 0.9)
+	btn_style.border_color = Color(0.6, 0.15, 0.1)
+	btn_style.border_width_bottom = 2
+	btn_style.border_width_top = 2
+	btn_style.border_width_left = 2
+	btn_style.border_width_right = 2
+	btn_style.corner_radius_top_left = 5
+	btn_style.corner_radius_top_right = 5
+	btn_style.corner_radius_bottom_left = 5
+	btn_style.corner_radius_bottom_right = 5
+	btn.add_theme_stylebox_override("normal", btn_style)
+	btn.add_theme_color_override("font_color", Color(1, 0.6, 0.5))
 	btn.pressed.connect(func(): GameManager.return_to_menu())
 	get_tree().root.add_child(btn)
